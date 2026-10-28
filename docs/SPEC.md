@@ -88,9 +88,9 @@ The last height in the index is the database version. Queries carry it in an
 downloads the new index.
 
 Every client downloads the whole index, so downloading it reveals nothing
-except that the client uses Blindfetch. The index is a deterministic function
-of the chain, so two servers covering the same heights publish the same index
-and wallets can compare digests.
+except that the client uses Blindfetch. The index is a function of the chain
+and the start height, so two servers built from the same heights publish the
+same index. `Blindfetch::compare_with` checks this before any query.
 
 ## Queries
 
@@ -103,9 +103,11 @@ uses k queries.
 
 The client decodes every answer, dummies included, and checks each row against
 its hash in the index. Any mismatch, and any transaction that fails its txid
-check, produces the same error. The wallet then stops using that server and
-does not retry. Without this, a server could corrupt one answer and watch
-whether the client noticed, which would show which queries were real.
+check, produces the same error, reported only after all planned rounds have
+been sent. The wallet then stops fetching real rows from that server. On a
+fixed schedule it keeps sending dummy-only ticks to it, so the server cannot
+tell which wallet it caught. Before querying, a client can compare the index
+digest with a second server (`--compare-with`).
 
 On a fixed schedule (`fetch_tick`), every tick is exactly `rounds` rounds.
 Transactions that do not fit wait for the next tick. A wallet that ticks on a
@@ -130,5 +132,6 @@ arrive.
   at all is sensitive.
 - `GetStatus` requests, which wallets send for transactions they broadcast
   themselves, still go to lightwalletd. It saw those transactions at broadcast.
-- A malicious server can refuse service. It cannot learn rows from failures,
-  because every answer is checked and a failure ends the session.
+- A malicious server can refuse service. With one server and no comparison it
+  can tamper with a single transaction and its row hash; see the threat model
+  for what that can and cannot reveal.

@@ -103,6 +103,27 @@ impl Blindfetch {
         Ok(Blindfetch { base, http, info, index, pir: Pir::new(scenario) })
     }
 
+    /// Checks this server's index against another operator's. The index is a
+    /// function of the chain, so two honest servers at the same height publish
+    /// the same bytes. A server that rewrote its index to target one
+    /// transaction shows up here before any query is sent.
+    pub async fn compare_with(&self, other: &str) -> anyhow::Result<()> {
+        let other = other.trim_end_matches('/');
+        let info: Info = self.http.get(format!("{other}/v1/info")).send().await?.error_for_status()?.json().await?;
+        ensure!(
+            info.first_height == self.info.first_height && info.last_height == self.info.last_height,
+            "the second server is at heights {}..={}, this one at {}..={}; compare when both are at the same height",
+            info.first_height,
+            info.last_height,
+            self.info.first_height,
+            self.info.last_height
+        );
+        let bytes = self.http.get(format!("{other}/v1/index")).send().await?.error_for_status()?.bytes().await?;
+        let theirs = Index::decode(&bytes)?;
+        ensure!(theirs.digest() == self.index.digest(), "{}", UNTRUSTED);
+        Ok(())
+    }
+
     pub fn info(&self) -> &Info {
         &self.info
     }

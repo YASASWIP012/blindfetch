@@ -18,7 +18,8 @@ Blindfetch operator, who may be malicious.
 | `GetTaddressTxids` | The wallet's transparent addresses. |
 
 Blindfetch replaces the second row. zcash-devtool in Blindfetch mode never
-sends it, even for transactions the database does not cover yet; those wait.
+sends it. A transaction the database does not cover yet stays pending, and on
+a fixed schedule a later tick fetches it once the server has indexed it.
 
 ## What a Blindfetch server learns
 
@@ -43,24 +44,37 @@ sends it, even for transactions the database does not cover yet; those wait.
 received and compares it with the txid it found while scanning. Memos, notes
 and values are all under the txid.
 
-**Selective failure.** A server corrupts one answer, or answers from a
-database with some rows changed, and watches whether the client reacts. Every
-answer, dummies included, is checked against the row hashes in the index, so a
-corrupted dummy fails the same way as a corrupted real row. Any failure ends the
-session with the same error, and zcash-devtool locks the server out. The server
-gets at most one failed session per wallet, and a failure that does not depend
-on which rows were real.
+**Selective failure.** A server corrupts one answer and watches whether the
+client reacts. Every answer, dummies included, is checked against the row
+hashes in the index, so a corrupted dummy fails the same way as a corrupted
+real row.
 
-**A lying index.** A server could publish an index whose hashes match its own
-altered rows. Real rows would then fail the txid check, which ends the session
-the same way. A wallet can also compare the index digest with a second server,
-since the index is a deterministic function of the chain.
+**A lying index.** The server writes the index, so it can change one
+transaction T and publish a matching row hash. Dummies then pass and only a
+wallet that wanted T fails its txid check. Two things stop the server from
+learning who that was:
+
+- The client sends every planned round even after a failure, and a wallet on a
+  fixed schedule keeps sending dummy-only ticks to a server that failed a
+  check. The server sees the same traffic either way. The wallet records the
+  server as locked out and alerts its user locally.
+- `--compare-with <url>` checks the index digest against a second operator
+  before any query is sent. The index is a function of the chain and the start
+  height, so honest servers at the same height publish the same bytes. We
+  tested this against a copy with one altered transaction; the wallet refused
+  it before querying.
+
+What remains: a wallet run once by hand, with no second server to compare
+against, that hits a lying index exits with an error after its planned rounds.
+If its user then behaves differently where the server can see it (for example
+by retrying at once), the server can learn something. A single honest second
+operator removes this.
 
 **Per-client versions.** A server could hand each client its own database
-version and recognise it later by the version header. Clients that compare
-`/v1/info` with a second server, or with the expected tip, see the
-mismatch. This is the weakest point in the current design: versions are not
-yet signed or cross-checked automatically.
+version and recognise it later by the version header. zcash-devtool refuses a
+version above its own chain tip, and `--compare-with` refuses one that a
+second operator does not serve. Without a second operator, a server can still
+pick among recent heights to tag clients.
 
 **Counting rounds.** Without a fixed schedule, a wallet that needs more rows
 sends more rounds, so the server learns an upper bound on how many rows it

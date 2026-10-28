@@ -14,8 +14,7 @@ cp "$ROOT"/web/pkg/bf_wasm.js "$ROOT"/web/pkg/bf_wasm_bg.wasm "$SITE/pkg/"
 cat > "$SITE/vercel.json" <<JSON
 {
   "rewrites": [
-    { "source": "/main/:path*", "destination": "$MAIN/:path*" },
-    { "source": "/test/:path*", "destination": "$TEST/:path*" }
+    { "source": "/main/:path*", "destination": "$MAIN/:path*" }
   ],
   "headers": [
     { "source": "/pkg/(.*).wasm", "headers": [{ "key": "Content-Type", "value": "application/wasm" }] },

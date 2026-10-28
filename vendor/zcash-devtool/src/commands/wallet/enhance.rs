@@ -45,6 +45,11 @@ pub(crate) struct Command {
     #[arg(long, requires = "blindfetch")]
     every: Option<u64>,
 
+    /// With --blindfetch, check the server's index against a second
+    /// Blindfetch server before sending any query.
+    #[arg(long, requires = "blindfetch")]
+    compare_with: Option<String>,
+
     /// Rounds per tick with --every.
     #[arg(long, default_value_t = 2, requires = "every")]
     rounds: usize,
@@ -159,6 +164,10 @@ impl Command {
                 anyhow::bail!("{url} failed a Blindfetch check earlier and is locked out (see {})", lock.display());
             }
             let mut bf = bf_client::Blindfetch::connect(url).await?;
+            if let Some(other) = &self.compare_with {
+                bf.compare_with(other).await?;
+                println!("Index matches {other}.");
+            }
             let info = bf.info().clone();
             // A database version ahead of the wallet's own view of the chain
             // can only be a per-client tag.
