@@ -10,9 +10,10 @@ ZECATHON 2026, Core & Tooling.
 
 | | |
 |---|---|
-| Live demo | DEMO_URL |
-| Mainnet server | SERVER_URL/main/v1/info |
+| Live demo | https://blindfetch.vercel.app |
+| Mainnet server | https://blindfetch.vercel.app/main/v1/info |
 | Video | VIDEO_URL |
+| Integration guide | [docs/INTEGRATION.md](docs/INTEGRATION.md) |
 | Spec | [docs/SPEC.md](docs/SPEC.md) |
 | Threat model | [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) |
 | Measurements | [docs/MEASUREMENTS.md](docs/MEASUREMENTS.md) |
@@ -35,20 +36,23 @@ IP, a list of your payments.
 ## What Blindfetch does
 
 1. **Index.** `bf-indexer` walks the chain from Ironwood activation and keeps
-   every transaction with a shielded output. It zeroes the Orchard and
-   Ironwood proofs, which sit outside the txid (ZIP 244, ZIP 229), and
-   collapses the zeros. On mainnet that cuts 42 MB of transactions to 9.6 MB,
-   and every one still hashes to its txid.
+   every transaction with a shielded output. It zeroes the proofs and
+   signatures, which sit outside the txid (ZIP 244, ZIP 229), and collapses
+   the zeros. On mainnet blocks 3,529,900 to 3,530,800 that cuts 120 MB of
+   transactions to 23 MB, and every one still hashes to its txid.
 2. **Serve.** `bf-server` packs them into 32 KiB rows and answers YPIR queries
    over the rows. YPIR comes from `valar-ypir`, the Zellic-audited crate ZODL
    uses for private nullifier lookups in shielded voting.
 3. **Fetch.** A wallet already knows where its transactions were mined. It
    downloads the whole index (a few bytes per transaction), finds its rows,
-   and asks for them in rounds of exactly four queries, filling spare slots
-   with queries for random rows. The server sees four encrypted queries every
-   time.
-4. **Verify.** The wallet recomputes each transaction's txid. A server that
-   changes a memo or serves the wrong bytes fails that check.
+   and asks for them in rounds of exactly four queries, with queries for
+   random rows shuffled in. On a fixed schedule (`--every`) it sends the same
+   number of rounds every tick, whether or not anything arrived.
+4. **Verify.** The wallet checks every row, dummies too, against a hash in the
+   index and recomputes each transaction's txid. A server that sends anything
+   wrong is locked out, and a scheduled wallet keeps sending it dummy ticks so
+   the server cannot tell which wallet caught it. `--compare-with` checks the
+   index against a second server before any query.
 
 ## Try it
 
@@ -63,8 +67,11 @@ cargo build --release -p bf-indexer -p bf-server -p zcash-devtool
 # Fetch random indexed transactions privately and check them against their txids
 ./target/release/bf-indexer --network main --data data --from 3532500 bench
 
-# A wallet that reads its memos through Blindfetch
-./target/release/zcash-devtool wallet -w <dir> enhance --blindfetch http://127.0.0.1:8484
+# A wallet that reads its memos through Blindfetch, on a fixed schedule
+./target/release/zcash-devtool wallet -w <dir> enhance --blindfetch http://127.0.0.1:8484 --every 300
+
+# The mainnet wallet demo: stock path against Blindfetch, same memos
+./demo/wallet-demo.sh
 ```
 
 ## Layout
@@ -80,11 +87,20 @@ cargo build --release -p bf-indexer -p bf-server -p zcash-devtool
 | `bf-wasm` + `web/` | The browser demo. |
 | `vendor/zcash-devtool` | Upstream zcash-devtool with `enhance --blindfetch`. The change alone is in `patches/`. |
 
+## Measured
+
+On an Apple M1 laptop: a query against a 1 GiB database takes 1.15 s on one
+core, with 784 KiB up and 120 KiB down. A round of four queries through the
+public URL takes 6 to 9 seconds, most of it the home connection the server
+sits on. Details in [docs/MEASUREMENTS.md](docs/MEASUREMENTS.md).
+
 ## Limits
 
-Read [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md). In short: transactions mined
-before Ironwood activation are not covered, the newest ten blocks are not
-covered until the server catches up, and PIR does nothing for your IP address.
+Read [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) and
+[docs/WHAT-IS-REAL.md](docs/WHAT-IS-REAL.md). In short: transactions mined
+before Ironwood activation are not covered, the newest blocks are covered once
+the server catches up, PIR does nothing for your IP address, and the public
+server runs on a laptop because the project had no budget for hosting.
 
 ## License
 
