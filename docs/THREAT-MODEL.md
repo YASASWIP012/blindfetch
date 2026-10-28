@@ -1,74 +1,82 @@
 # Threat model
 
-## Who we defend against
+## Adversary
 
 The operator of the server a wallet reads from, or anyone who can read that
 server's logs or traffic: a hosting company, a subpoena, an attacker who got
-in. Today that is the lightwalletd operator. With Blindfetch it is the
-Blindfetch operator too.
+in. Today that is the lightwalletd operator. With Blindfetch it is also the
+Blindfetch operator, who may be malicious.
 
-## What a stock light wallet reveals to lightwalletd
+## What a stock light wallet tells lightwalletd
 
 | Request | Reveals |
 |---|---|
-| `GetBlockRange` (compact blocks) | Nothing about which notes are yours: every wallet downloads the same blocks. It does reveal the wallet's birthday height and when it syncs. |
-| `GetTransaction(txid)` for enhancement | **Which transactions are yours**, one request per received transaction, all from one IP and one session. |
-| `GetTransaction(txid)` for status | Transactions you sent. The server saw them at broadcast. |
-| `SendTransaction` | Transactions you sent. |
-| `GetTaddressTxids` | Your transparent addresses. |
+| `GetBlockRange` (compact blocks) | The wallet's birthday height and when it syncs. Every wallet downloads the same blocks, so nothing about which notes are its own. |
+| `GetTransaction(txid)` for enhancement | **Which transactions are the wallet's**, one request per received transaction, in one session from one address. |
+| `GetTransaction(txid)` for status | Transactions the wallet sent. The server saw them at broadcast. |
+| `SendTransaction` | Transactions the wallet sent. |
+| `GetTaddressTxids` | The wallet's transparent addresses. |
 
-Blindfetch replaces the second row.
+Blindfetch replaces the second row. zcash-devtool in Blindfetch mode never
+sends it, even for transactions the database does not cover yet; those wait.
 
 ## What a Blindfetch server learns
 
-- That an IP address downloaded the index and sent requests. Every request
-  against one database version has the same size in both directions, and
-  carries exactly `batch` queries.
-- The time of each request.
+- That an address downloaded the index and sent requests. Every request
+  against one database version has the same size in each direction and carries
+  exactly `batch` queries. Responses are never compressed.
+- The time of each request. A wallet on a fixed schedule makes this the same
+  whether or not it received anything.
 
 ## What it does not learn
 
-- Which rows were asked for. This is the PIR guarantee: YPIR queries are
-  LWE ciphertexts, and the server's view of a query for row 5 is
-  indistinguishable from a query for row 5,000 without breaking the
-  underlying lattice assumption.
+- Which rows were asked for. YPIR queries are LWE ciphertexts. Telling a query
+  for row 5 from a query for row 5,000 means breaking the lattice assumption.
 - How many queries in a round were real. Dummies are queries for random rows,
-  built and encrypted the same way.
+  built the same way, in random slots.
 - Which transactions. Rows hold packed transactions in chain order, and the
-  index is public and identical for everyone.
+  index is public and the same for everyone.
 
-## Attacks and answers
+## Attacks
 
-**The server serves a wrong or altered transaction.** The wallet recomputes
-the txid from what it received and compares it to the txid it found while
-scanning compact blocks. Memos, notes and values are all under the txid.
-Proofs are not, but the wallet does not need them; the chain already
-verified them.
+**Wrong or altered transaction.** The wallet recomputes the txid of what it
+received and compares it with the txid it found while scanning. Memos, notes
+and values are all under the txid.
 
-**The server serves a different index to one client.** A crafted index could
-point a client at rows that reveal something only if row choice leaked, and it
-does not. At worst the client fetches the wrong bytes and the txid check
-fails. A wallet can also compare index hashes across servers.
+**Selective failure.** A server corrupts one answer, or answers from a
+database with some rows changed, and watches whether the client reacts. Every
+answer, dummies included, is checked against the row hashes in the index, so a
+corrupted dummy fails the same way as a corrupted real row. Any failure ends the
+session with the same error, and zcash-devtool locks the server out. The server
+gets at most one failed session per wallet, and a failure that does not depend
+on which rows were real.
 
-**The server counts rounds.** A wallet that receives many payments needs more
-rounds. A wallet that sends rounds on a timer, real or dummy, removes this
-signal. `bf-client` exposes `cover_round` for that. Without it, the server
-learns an upper bound: "this client fetched at most 8k rows".
+**A lying index.** A server could publish an index whose hashes match its own
+altered rows. Real rows would then fail the txid check, which ends the session
+the same way. A wallet can also compare the index digest with a second server,
+since the index is a deterministic function of the chain.
 
-**Timing.** A wallet that enhances right after a payment lands reveals that
-something arrived, though not what. Rounds on a timer close this too.
+**Per-client versions.** A server could hand each client its own database
+version and recognise it later by the version header. Clients that compare
+`/v1/info` with a second server, or with the expected tip, see the
+mismatch. This is the weakest point in the current design: versions are not
+yet signed or cross-checked automatically.
+
+**Counting rounds.** Without a fixed schedule, a wallet that needs more rows
+sends more rounds, so the server learns an upper bound on how many rows it
+fetched. `fetch_tick` and `enhance --every` remove this.
+
+**Timing.** A wallet that fetches right after a payment arrives reveals that
+something arrived. The fixed schedule removes this too.
 
 **Network address.** PIR does nothing for the IP address. Run the client over
-Tor or an HTTP relay if that matters. The server never writes client
-addresses to its logs; the reverse proxy in our deployment is configured not
-to either.
-
-**Database version as a fingerprint.** Every client is told the same version
-and must use it; the server refuses queries for any other.
+Tor or a relay if that matters. The server does not log addresses. The public
+demo is proxied through Vercel and Cloudflare, which see addresses as any proxy
+does.
 
 ## Out of scope
 
 - Transactions mined before Ironwood activation.
-- Network-level adversaries who watch both the client and other parties.
-- Bugs in `valar-ypir`. Its authors had it audited by Zellic; we use its
-  client and server code unchanged.
+- Network observers who watch both the client and other parties.
+- Denial of service.
+- Bugs in `valar-ypir`. We use its client and server code unchanged.

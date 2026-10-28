@@ -34,7 +34,7 @@
 
     <section class="card">
       <h2>Fetch a transaction privately</h2>
-      <p class="muted">Pick any shielded transaction mined since Ironwood activation. Your browser builds the queries; the server answers without learning which one you picked.</p>
+      <p class="muted">Pick any shielded transaction mined since Ironwood activation. Your browser builds the queries, and the server answers without learning which one you picked.</p>
       <div class="pick">
         <label>Height <input id="h" inputmode="numeric" autocomplete="off"></label>
         <label>Position in block <input id="i" inputmode="numeric" autocomplete="off"></label>
@@ -55,7 +55,7 @@
         </div>
         <div>
           <h3>This Blindfetch server</h3>
-          <p class="muted">Its full request log, live from <code>/v1/seen</code>. This is everything it knows.</p>
+          <p class="muted">Its whole request log, live from <code>/v1/seen</code>. This is everything it knows about you.</p>
           <pre id="seen" class="log">Loading…</pre>
         </div>
       </div>
@@ -64,10 +64,10 @@
     <section class="card prose">
       <h2>How it works</h2>
       <ol>
-        <li>The server keeps every transaction with a shielded output since Ironwood activation, with its proofs removed. Proofs are not covered by the txid (ZIP 244, ZIP 229), so what remains still matches the txid exactly.</li>
-        <li>It cuts them into 4 KiB rows and serves the rows over YPIR, the PIR scheme ZODL uses for shielded voting, from the Zellic-audited <code>valar-ypir</code> crate.</li>
-        <li>Your wallet already knows where its transactions were mined from scanning compact blocks. It downloads the whole index, finds the rows, and asks for them in rounds of exactly eight queries, filling empty slots with random rows.</li>
-        <li>It recomputes the txid of what came back. A server that alters a memo or serves the wrong transaction fails that check.</li>
+        <li>The server keeps every transaction with a shielded output since Ironwood activation. Proofs and signatures sit outside the txid (ZIP 244, ZIP 229), so it zeroes them and stores each transaction at about a fifth of its mined size, with the same txid.</li>
+        <li>It packs them into 32 KiB rows and answers YPIR queries over the rows. YPIR is the PIR scheme ZODL uses for shielded voting, from the Zellic-audited <code>valar-ypir</code> crate.</li>
+        <li>A wallet already knows where its transactions were mined from scanning compact blocks. It downloads the whole index and asks for its rows in rounds of exactly four queries, with dummy queries for random rows shuffled in.</li>
+        <li>It checks every row it gets back, dummies too, against a hash in the index, and recomputes the txid of each transaction. A server that sends anything wrong is caught and dropped.</li>
       </ol>
       <p><a id="repo" href="#">Source, spec and threat model</a></p>
     </section>

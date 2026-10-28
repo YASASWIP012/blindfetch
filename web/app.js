@@ -41,6 +41,9 @@ async function connect() {
     ].map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
     renderRecent();
     $('go').disabled = false;
+    // ?auto fetches the newest transaction straight away, for links that
+    // should show the whole round trip without a click.
+    if (new URLSearchParams(location.search).has('auto')) fetchPrivately();
   } catch (e) {
     $('status').textContent = `Could not reach the ${net === 'main' ? 'mainnet' : 'testnet'} server: ${e.message || e}`;
   }
