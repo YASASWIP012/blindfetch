@@ -9,7 +9,7 @@ MAIN="$1"
 TEST="${2:-$1}"
 SITE="$ROOT/.site/blindfetch"
 rm -rf "$SITE" && mkdir -p "$SITE/pkg"
-cp "$ROOT"/web/{index.html,app.js,style.css} "$SITE/"
+cp "$ROOT"/web/{index.html,app.js,style.css,foundation.css} "$SITE/"
 cp "$ROOT"/web/pkg/bf_wasm.js "$ROOT"/web/pkg/bf_wasm_bg.wasm "$SITE/pkg/"
 cat > "$SITE/vercel.json" <<JSON
 {

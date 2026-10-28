@@ -1,76 +1,253 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-accent="mono">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Blindfetch</title>
   <meta name="description" content="Zcash light wallets read their memos over PIR, so the server never learns which transactions are theirs.">
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="foundation.css">
   <link rel="stylesheet" href="style.css">
+  <script>document.documentElement.classList.add('js')</script>
 </head>
 <body>
-  <header class="wrap">
-    <p class="kicker">Zcash · Ironwood · private information retrieval</p>
-    <h1>Blindfetch</h1>
-    <p class="lede">
-      To read a memo, a Zcash light wallet asks its server for the transaction by txid.
-      That one request tells the server which payment is yours.
-      Blindfetch answers the same request over PIR: the wallet gets the transaction,
-      and the server cannot tell which one it sent.
-    </p>
+  <header class="nav">
+    <div class="nav__bar">
+      <a class="nav__brand" href="#top">
+        <svg class="app-icon" viewBox="0 0 28 28" aria-hidden="true"><rect width="28" height="28" rx="6.3" fill="#1D1D1F"/><path d="M6.5 14c2-3.4 4.6-5.1 7.5-5.1s5.5 1.7 7.5 5.1c-2 3.4-4.6 5.1-7.5 5.1S8.5 17.4 6.5 14z" fill="none" stroke="#fff" stroke-width="1.6"/><circle cx="14" cy="14" r="2.3" fill="#fff"/><path d="M7 21L21 7" stroke="#1D1D1F" stroke-width="3.4"/><path d="M7.4 20.6L20.6 7.4" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>
+        Blindfetch
+      </a>
+      <nav class="nav__links" aria-label="Sections">
+        <a href="#how">How it works</a>
+        <a href="#try">Try it</a>
+        <a href="#proof">Proof</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+      <a class="btn btn-ink btn-sm" href="https://github.com/YASASWIP012/blindfetch">Source</a>
+    </div>
   </header>
 
-  <main class="wrap">
-    <section class="card" id="status-card">
-      <div class="row between">
-        <h2>The database</h2>
-        <span class="muted">Zcash mainnet</span>
-      </div>
-      <p id="status" class="muted">Connecting…</p>
-      <dl class="stats" id="stats"></dl>
-    </section>
-
-    <section class="card">
-      <h2>Fetch a transaction privately</h2>
-      <p class="muted">Pick any shielded transaction mined since Ironwood activation. Your browser builds the queries, and the server answers without learning which one you picked.</p>
-      <div class="pick">
-        <label>Height <input id="h" inputmode="numeric" autocomplete="off"></label>
-        <label>Position in block <input id="i" inputmode="numeric" autocomplete="off"></label>
-        <label class="grow">Expected txid (optional) <input id="txid" autocomplete="off" spellcheck="false" placeholder="paste from a block explorer to check it"></label>
-        <button id="go" class="cta" disabled>Fetch privately</button>
-      </div>
-      <div id="recent" class="recent"></div>
-      <div id="result" class="result" hidden></div>
-    </section>
-
-    <section class="card">
-      <h2>What each server learns</h2>
-      <div class="split">
-        <div>
-          <h3>A stock lightwalletd</h3>
-          <p class="muted">The request a wallet sends today to read this memo.</p>
-          <pre id="stock" class="log">Fetch a transaction to see it.</pre>
+  <main id="top">
+    <section class="hero">
+      <div class="container">
+        <span class="badge badge--dot">Live on Zcash mainnet</span>
+        <h1>Read your memos. <span class="t-muted">The server never learns which.</span></h1>
+        <p class="lead">To read a memo, a Zcash light wallet asks its server for the whole transaction by txid, and that request names a payment you received. Blindfetch answers the same request over private information retrieval.</p>
+        <div class="cta-row">
+          <a class="btn btn-ink btn-lg" href="#try">Fetch a transaction privately</a>
+          <a class="btn btn-outline btn-lg" href="https://github.com/YASASWIP012/blindfetch/blob/main/docs/SPEC.md">Read the spec</a>
         </div>
-        <div>
-          <h3>This Blindfetch server</h3>
-          <p class="muted">Its whole request log, live from <code>/v1/seen</code>. Your address and the exact time also reach it, as with any server.</p>
-          <pre id="seen" class="log">Loading…</pre>
+        <p class="trust"><span>Open source, MIT or Apache-2.0</span><span>Audited PIR library</span><span>No account needed</span></p>
+
+        <div class="hero__visual">
+          <div class="stage">
+            <div class="grid grid-2 hero-pair" aria-hidden="true">
+              <div class="window window--dark">
+                <div class="window__bar"><div class="lights"><i></i><i></i><i></i></div><span class="window__title">zcash-devtool, today</span></div>
+                <pre class="term"><span class="dim">$ zcash-devtool wallet enhance</span>
+<span class="bad">GetTransaction 967ec793…48ed32</span>
+<span class="bad">GetTransaction 8d9f0e70…bef49c</span>
+<span class="bad">GetTransaction f572a5d0…7afadf</span>
+
+<span class="dim">lightwalletd now holds a list of
+this wallet's payments.</span></pre>
+              </div>
+              <div class="window window--dark">
+                <div class="window__bar"><div class="lights"><i></i><i></i><i></i></div><span class="window__title">with --blindfetch</span></div>
+                <pre class="term"><span class="dim">$ zcash-devtool wallet enhance --blindfetch</span>
+Fetched 3 of 3 transactions in 1 round
+of 4 queries: 2.1 MiB up, 0.5 MiB down
+<span class="good">lightwalletd was not asked for any of them.</span>
+
+<span class="dim">Same memos, byte for byte.</span></pre>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
 
-    <section class="card prose">
-      <h2>How it works</h2>
-      <ol>
-        <li>The server keeps every transaction with a shielded output since Ironwood activation. Proofs and signatures sit outside the txid (ZIP 244, ZIP 229), so it zeroes them and stores each transaction at about a fifth of its mined size, with the same txid.</li>
-        <li>It packs them into 32 KiB rows and answers YPIR queries over the rows. YPIR is the PIR scheme ZODL uses for shielded voting, from the Zellic-audited <code>valar-ypir</code> crate.</li>
-        <li>A wallet already knows where its transactions were mined from scanning compact blocks. It downloads the whole index and asks for its rows in rounds of exactly four queries, with dummy queries for random rows shuffled in.</li>
-        <li>It checks every row it gets back, dummies too, against a hash in the index, and recomputes the txid of each transaction. A server that sends anything wrong is caught and dropped.</li>
-      </ol>
-      <p><a id="repo" href="#">Source, spec and threat model</a></p>
+    <section class="section section--alt" id="proof">
+      <div class="container">
+        <div class="facts">
+          <div class="fact reveal"><span class="fact__n t-mono">0</span><span class="t-small">txids sent to lightwalletd by a mainnet wallet reading three memos</span></div>
+          <div class="fact reveal" style="--i:1"><span class="fact__n t-mono">5.3×</span><span class="t-small">smaller than mined, with every txid unchanged</span></div>
+          <div class="fact reveal" style="--i:2"><span class="fact__n t-mono">4</span><span class="t-small">queries per round, the same size every time</span></div>
+          <div class="fact reveal" style="--i:3"><span class="fact__n t-mono">1.15 s</span><span class="t-small">per query on a 1 GiB database, on a laptop</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="how">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow"><span class="dot"></span>The leak</span>
+          <h2>One request per payment.</h2>
+          <p class="lead">Compact blocks carry 52 bytes of each note, enough to find a payment and too little for its memo. So the wallet asks for the rest by txid.</p>
+        </div>
+        <div class="grid grid-2">
+          <div class="card card--flat reveal">
+            <h3 class="t-title">A stock light wallet</h3>
+            <p class="t-small">One <code class="t-mono">GetTransaction</code> per received transaction, in one session, from one address. zcash-devtool carries a TODO about it, and some wallets switch memos off because of it.</p>
+            <pre class="mini bad-l">GetTransaction(txid) → your payment</pre>
+          </div>
+          <div class="card card--chosen reveal" style="--i:1">
+            <h3 class="t-title">With Blindfetch</h3>
+            <p class="t-small">Every fetch is four encrypted queries for rows of a public database, with dummies shuffled in. The server answers all four without learning which rows were read.</p>
+            <pre class="mini good-l">4 × PIR query → rows → same txid</pre>
+          </div>
+        </div>
+
+        <div class="stack features">
+          <div class="split reveal">
+            <div>
+              <span class="eyebrow">Index</span>
+              <h3>Same txid, a fifth of the size.</h3>
+              <p class="lead">Proofs and signatures sit outside the txid (ZIP 244, ZIP 229). The indexer zeroes them, collapses the zeros and checks that every transaction still hashes to its txid.</p>
+              <div class="chips"><span class="chip">Every shielded transaction since Ironwood</span><span class="chip">Reorg checks</span><span class="chip">Follows the tip</span></div>
+            </div>
+            <div class="stage stage--soft">
+              <div class="window"><div class="window__bar"><div class="lights"><i></i><i></i><i></i></div><span class="window__title">bf-indexer build</span></div>
+                <pre class="term term--light">blocks       3,529,900 to 3,530,800
+transactions 12,969
+mined        120.1 MB
+stored        22.8 MB   <b>5.3× smaller</b>
+txids        all unchanged</pre></div>
+            </div>
+          </div>
+
+          <div class="split split--flip reveal">
+            <div>
+              <span class="eyebrow">Fetch</span>
+              <h3>Four queries, every five minutes.</h3>
+              <p class="lead">YPIR, from the Zellic-audited <code class="t-mono">valar-ypir</code> crate that ZODL uses for shielded voting, hides which row each query asks for. The wallet sends the same round on a timer whether or not anything arrived.</p>
+              <div class="chips"><span class="chip">32 KiB rows</span><span class="chip">Dummies shuffled in</span><span class="chip">Fixed schedule by default</span></div>
+            </div>
+            <div class="stage stage--soft">
+              <div class="window"><div class="window__bar"><div class="lights"><i></i><i></i><i></i></div><span class="window__title">server log, two ticks</span></div>
+                <pre class="term term--light">tick 1, fetched 3 transactions
+  query  4 queries  in 2,228,276  out 491,540
+tick 2, fetched nothing
+  query  4 queries  in 2,228,276  out 491,540</pre></div>
+            </div>
+          </div>
+
+          <div class="split reveal">
+            <div>
+              <span class="eyebrow">Verify</span>
+              <h3>Every answer checked, dummies too.</h3>
+              <p class="lead">The index carries a hash of every row. The wallet checks all four answers and recomputes each txid. A server that sends anything wrong is locked out, and keeps getting dummy traffic so it cannot tell whom it caught.</p>
+              <div class="chips"><span class="chip">Row hashes</span><span class="chip">Txid check</span><span class="chip">Cross-check a second server</span></div>
+            </div>
+            <div class="stage stage--soft">
+              <div class="window"><div class="window__bar"><div class="lights"><i></i><i></i><i></i></div><span class="window__title">a tampered server</span></div>
+                <pre class="term term--light">$ enhance --blindfetch $EVIL \
+          --compare-with $HONEST
+Error: the Blindfetch server returned
+data that does not match its index
+or the chain; stop using it</pre></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section--alt" id="try">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow"><span class="dot"></span>Try it here</span>
+          <h2>Fetch any mainnet transaction.</h2>
+          <p class="lead">Your browser builds the queries and opens the answers. The server sees four queries of the same size, whichever transaction you pick.</p>
+        </div>
+        <div class="try">
+          <div class="card controls">
+            <p class="t-small" id="status">Connecting to the server…</p>
+            <label class="field">Height <input id="h" inputmode="numeric" autocomplete="off"></label>
+            <label class="field">Position in block <input id="i" inputmode="numeric" autocomplete="off"></label>
+            <label class="field">Expected txid, optional <input id="txid" autocomplete="off" spellcheck="false" placeholder="paste from an explorer to check it"></label>
+            <button id="go" class="btn btn-ink" disabled>Fetch privately</button>
+            <div id="recent" class="chips recent"></div>
+          </div>
+          <div class="stage stage--soft">
+            <div class="window">
+              <div class="window__bar"><div class="lights"><i></i><i></i><i></i></div><span class="window__title">blindfetch.vercel.app</span></div>
+              <div class="window__body">
+                <dl class="stats" id="stats"></dl>
+                <div id="result" class="result" hidden></div>
+                <div class="grid grid-2 logs">
+                  <div>
+                    <p class="t-title">A stock lightwalletd would get</p>
+                    <pre id="stock" class="log">Fetch a transaction to see it.</pre>
+                  </div>
+                  <div>
+                    <p class="t-title">This server's whole log</p>
+                    <pre id="seen" class="log">Loading…</pre>
+                  </div>
+                </div>
+                <p class="t-micro note">The server runs on the author's laptop behind a free tunnel, so a round takes several seconds. Your address and the time of each request reach it, as with any server.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow"><span class="dot"></span>Everything in the repository</span>
+          <h2>Built to be merged.</h2>
+        </div>
+        <div class="grid grid-3">
+          <a class="tile reveal" href="https://github.com/YASASWIP012/blindfetch/blob/main/patches/zcash-devtool-blindfetch.patch"><span class="icon-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-6-6-6M12 19h8"/></svg></span><div><p class="t-title">zcash-devtool patch</p><p><code class="t-mono">enhance --blindfetch</code>, ready for upstream.</p></div></a>
+          <a class="tile reveal" style="--i:1" href="https://github.com/YASASWIP012/blindfetch/blob/main/docs/INTEGRATION.md"><span class="icon-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7H6a3 3 0 000 6h3M15 7h3a3 3 0 010 6h-3M8 10h8"/></svg></span><div><p class="t-title">Integration guide</p><p>The hook every librustzcash wallet already has.</p></div></a>
+          <a class="tile reveal" style="--i:2" href="https://github.com/YASASWIP012/blindfetch/blob/main/docs/THREAT-MODEL.md"><span class="icon-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z"/></svg></span><div><p class="t-title">Threat model</p><p>What the server learns, and what it still could.</p></div></a>
+          <a class="tile reveal" href="https://github.com/YASASWIP012/blindfetch/blob/main/docs/MEASUREMENTS.md"><span class="icon-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span><div><p class="t-title">Measurements</p><p>Size, query cost and round trips, measured.</p></div></a>
+          <a class="tile reveal" style="--i:1" href="https://github.com/YASASWIP012/blindfetch/blob/main/docs/SPEC.md"><span class="icon-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6"/></svg></span><div><p class="t-title">Spec</p><p>Index format, rows, queries and checks.</p></div></a>
+          <a class="tile reveal" style="--i:2" href="https://github.com/YASASWIP012/blindfetch/blob/main/docs/WHAT-IS-REAL.md"><span class="icon-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><div><p class="t-title">What is real</p><p>Each claim, and how to check it yourself.</p></div></a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section--alt" id="faq">
+      <div class="container">
+        <div class="section-head"><span class="eyebrow"><span class="dot"></span>FAQ</span><h2>Questions worth asking.</h2></div>
+        <div class="faq">
+          <details><summary>Does the server have to be trusted?</summary><p>Not with which transactions you read. PIR keeps that from it, and every answer is checked against the index and the txid. It can refuse service, and it sees your address and when you connect, like any server.</p></details>
+          <details><summary>Why not hide the request among decoy txids?</summary><p>A server that sees your real txid among seven decoys learns that one of eight is yours, and repeated fetches narrow it down. Here every request covers the whole database.</p></details>
+          <details><summary>Why not download every transaction?</summary><p>That is about 8 MB per day of chain, so a wallet offline for a week would download about 55 MB. A Blindfetch round is about 2 to 3 MB up and 0.5 MB down.</p></details>
+          <details><summary>What about memos from before Ironwood?</summary><p>They are not in the database. In Blindfetch mode zcash-devtool leaves them pending and never sends their txids to lightwalletd.</p></details>
+          <details><summary>Which wallets can use it?</summary><p>zcash-devtool today. Any wallet built on librustzcash answers the same enhancement request, and the integration guide shows the change.</p></details>
+          <details><summary>Who runs the server?</summary><p>For this demo, the author, on a laptop. Anyone can run one with a lightwalletd endpoint, and wallets can compare two servers' indexes before trusting either.</p></details>
+        </div>
+      </div>
+    </section>
+
+    <section class="section final">
+      <div class="container">
+        <h2>Same memos. <span class="t-muted">No list of your payments.</span></h2>
+        <div class="cta-row">
+          <a class="btn btn-ink btn-lg" href="https://github.com/YASASWIP012/blindfetch">Read the source</a>
+          <a class="btn btn-outline btn-lg" href="#try">Try it again</a>
+        </div>
+      </div>
     </section>
   </main>
 
-  <footer class="wrap muted">Built for ZECATHON 2026, Core &amp; Tooling.</footer>
+  <footer class="footer">
+    <div class="container">
+      <span>Blindfetch · ZECATHON 2026, Core &amp; Tooling</span>
+      <span><a href="https://github.com/YASASWIP012/blindfetch" id="repo">GitHub</a> · Made by Yasaswi Paruchuri</span>
+    </div>
+  </footer>
+
+  <script>
+  if('IntersectionObserver' in window){
+    const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{rootMargin:'0px 0px -8% 0px'});
+    document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+  }else document.querySelectorAll('.reveal').forEach(el=>el.classList.add('in'));
+  </script>
   <script type="module" src="app.js"></script>
 </body>
 </html>

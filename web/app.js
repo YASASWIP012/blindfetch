@@ -6,7 +6,6 @@ const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 const SERVERS = LOCAL
   ? { main: 'http://127.0.0.1:8484', test: 'http://127.0.0.1:8485' }
   : { main: '/main', test: '/test' };
-const REPO = 'https://github.com/YASASWIP012/blindfetch';
 
 const $ = (id) => document.getElementById(id);
 // Everything shown comes from the server or the chain; escape it.
@@ -54,7 +53,7 @@ async function connect() {
 
 function renderRecent() {
   const list = session.recent(6);
-  $('recent').innerHTML = '<span class="muted">Recent:</span> ' + list.map((e) =>
+  $('recent').innerHTML = '<span class="label">Recent transactions</span>' + list.map((e) =>
     `<button class="chip" data-h="${esc(e.height)}" data-i="${esc(e.tx_index)}">${esc(fmtNum(e.height))} · #${esc(e.tx_index)} · ${esc(fmtBytes(e.len))}</button>`
   ).join('');
   for (const b of $('recent').querySelectorAll('button')) {
@@ -133,15 +132,7 @@ async function pollSeen(once) {
   if (!once) seenTimer = setTimeout(pollSeen, 5000);
 }
 
-for (const b of document.querySelectorAll('.seg button')) {
-  b.onclick = () => {
-    for (const o of document.querySelectorAll('.seg button')) o.classList.toggle('on', o === b);
-    net = b.dataset.net;
-    connect();
-  };
-}
 $('go').onclick = fetchPrivately;
-$('repo').href = REPO;
 
 await init();
 connect();
