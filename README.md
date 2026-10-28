@@ -12,7 +12,7 @@ ZECATHON 2026, Core & Tooling.
 |---|---|
 | Live demo | https://blindfetch.vercel.app |
 | Mainnet server | https://blindfetch.vercel.app/main/v1/info |
-| Video | VIDEO_URL |
+| Video | https://youtu.be/OjTWDLSd-sk (1:47) |
 | Integration guide | [docs/INTEGRATION.md](docs/INTEGRATION.md) |
 | Spec | [docs/SPEC.md](docs/SPEC.md) |
 | Threat model | [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) |
