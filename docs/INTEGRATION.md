@@ -25,7 +25,7 @@ let wants: Vec<bf_client::Want> = db
     .collect();
 
 // Fixed schedule: call this on a timer with the same `rounds` every time.
-let (results, _stats) = bf.fetch_tick(&params, &wants, 2).await?;
+let (results, _stats) = bf.fetch_tick(&params, &wants, 1).await?;
 
 for (want, fetched) in results {
     if let bf_client::Fetched::Found(tx) = fetched {
@@ -54,10 +54,12 @@ for (want, fetched) in results {
 
 ## Mobile
 
-A tick costs about what the measurements in `docs/MEASUREMENTS.md` show for a
-round, times `rounds`. A mobile wallet should tick when the app opens and then
-on a slow timer (say every 30 minutes while open), and can use one round per
-tick when few payments are expected.
+A tick of one round costs about 2.1 MiB up and 0.5 MiB down against a small
+database, and about 3.1 MiB up and 0.5 MiB down at the full 1 GiB size (see
+`docs/MEASUREMENTS.md`). The index is downloaded once per database version.
+A mobile wallet should tick when the app opens and then on a slow timer (say
+every 30 minutes while open, or only on Wi-Fi). Payments that arrive between
+ticks wait for the next one.
 
 ## Running a server
 

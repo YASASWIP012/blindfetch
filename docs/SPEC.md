@@ -110,9 +110,10 @@ tell which wallet it caught. Before querying, a client can compare the index
 digest with a second server (`--compare-with`).
 
 A wallet fetches in ticks (`fetch_tick`) of exactly `rounds` rounds.
-Transactions that do not fit wait for the next tick. zcash-devtool uses ticks
-for every fetch, and with `--every` it ticks on a timer, so it sends the same
-traffic whether it received nothing or many payments.
+Transactions that do not fit wait for the next tick. zcash-devtool ticks on a
+timer by default (every 300 seconds, one round per tick), so it sends the same
+traffic at the same times whether it received nothing or many payments.
+`--once` is an explicit opt-out that reveals when the wallet fetched.
 
 ## What the server learns
 

@@ -79,8 +79,8 @@ the same record in the server's log: two requests of 2,228,276 bytes in and
 
 ## What this costs a wallet
 
-At the full database size, a tick of two rounds is about 6 MiB up and
-1 MiB down. Downloading the index is about 2 MB once per version. A desktop
+At the full database size, a tick of one round (the default) is about
+3.1 MiB up and 0.5 MiB down. Downloading the index is about 2 MB once per version. A desktop
 wallet can tick every few minutes. A mobile wallet should tick when the app
 opens and then rarely.
 

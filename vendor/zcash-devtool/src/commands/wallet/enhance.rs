@@ -39,20 +39,26 @@ pub(crate) struct Command {
     #[arg(long, requires = "blindfetch")]
     allow_fallback: bool,
 
-    /// With --blindfetch, keep running and fetch on a fixed schedule: every
-    /// this many seconds, exactly --rounds rounds, whether or not anything
-    /// arrived. The server then cannot tell when payments land.
+    /// With --blindfetch, how often to fetch, in seconds. The wallet keeps
+    /// running and fetches on this schedule whether or not anything arrived,
+    /// so the server cannot tell when payments land.
+    #[arg(long, default_value_t = 300, requires = "blindfetch")]
+    every: u64,
+
+    /// With --blindfetch, fetch once and exit instead of running on a
+    /// schedule. This tells the server when you fetched, which can hint that
+    /// a payment just arrived.
     #[arg(long, requires = "blindfetch")]
-    every: Option<u64>,
+    once: bool,
 
     /// With --blindfetch, check the server's index against a second
     /// Blindfetch server before sending any query.
     #[arg(long, requires = "blindfetch")]
     compare_with: Option<String>,
 
-    /// Rounds per fetch (per tick with --every). Every fetch sends exactly
-    /// this many; transactions that do not fit wait for the next one.
-    #[arg(long, default_value_t = 2, requires = "blindfetch")]
+    /// Rounds per fetch. Every fetch sends exactly this many (four queries
+    /// each); transactions that do not fit wait for the next fetch.
+    #[arg(long, default_value_t = 1, requires = "blindfetch")]
     rounds: usize,
 }
 
@@ -180,9 +186,9 @@ impl Command {
             );
 
             // Ticks fall on fixed deadlines, however long a tick's work takes.
-            let mut ticks = self
-                .every
-                .map(|secs| tokio::time::interval(std::time::Duration::from_secs(secs.max(1))));
+            let scheduled = !self.once;
+            let mut ticks = scheduled
+                .then(|| tokio::time::interval(std::time::Duration::from_secs(self.every.max(1))));
             // Set once the server fails a check. From then on every tick is
             // dummies only, so the server cannot see that anything changed.
             let mut caught = false;
@@ -221,7 +227,7 @@ impl Command {
                         let mut f = std::fs::OpenOptions::new().create(true).append(true).open(&lock)?;
                         writeln!(f, "{url}")?;
                         eprintln!("ALERT: {e}. Locked out in {}.", lock.display());
-                        if self.every.is_none() {
+                        if !scheduled {
                             return Err(e);
                         }
                         // Keep the same schedule with dummies only, so the
@@ -281,12 +287,12 @@ impl Command {
                     // In one-shot mode, keep the lightwalletd loop below from
                     // asking for it. On a schedule, leave it pending so a later
                     // tick fetches it once the server has indexed it.
-                    if !self.allow_fallback && self.every.is_none() {
+                    if !self.allow_fallback && !scheduled {
                         satisfied_requests.insert(TransactionDataRequest::Enhancement(*txid));
                     }
                 }
 
-                if self.every.is_none() {
+                if !scheduled {
                     break;
                 }
             }

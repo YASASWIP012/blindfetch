@@ -28,8 +28,8 @@ echo "1. Stock: ask lightwalletd for each transaction by txid"
 "$DEVTOOL" wallet -w "$W/a" enhance -s zecrocks 2>/dev/null
 
 echo
-echo "2. Blindfetch: the same transactions over PIR"
-"$DEVTOOL" wallet -w "$W/b" enhance -s zecrocks --blindfetch "$SERVER" 2>/dev/null
+echo "2. Blindfetch: the same transactions over PIR (one fixed fetch; a real wallet runs on a timer)"
+"$DEVTOOL" wallet -w "$W/b" enhance -s zecrocks --blindfetch "$SERVER" --once 2>/dev/null
 
 echo
 memos() { "$DEVTOOL" wallet -w "$1" list-tx 2>/dev/null | grep -E '^[0-9a-f]{64}|Memo'; }

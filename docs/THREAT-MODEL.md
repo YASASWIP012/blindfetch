@@ -76,14 +76,22 @@ version above its own chain tip, and `--compare-with` refuses one that a
 second operator does not serve. Without a second operator, a server can still
 pick among recent heights to tag clients.
 
-**Counting rounds.** zcash-devtool sends exactly `--rounds` rounds (2 by
-default) on every fetch, one-off runs included, and leaves what does not fit
-for the next fetch. The number of rounds never depends on how many
+**Counting rounds.** zcash-devtool sends exactly `--rounds` rounds (1 by
+default, four queries) on every fetch and leaves what does not fit for the
+next fetch. The number of rounds never depends on how many
 transactions the wallet wanted. The library's `fetch` (rounds as needed, at
 least two) remains for tools that do not care, such as the benchmark.
 
 **Timing.** A wallet that fetches right after a payment arrives reveals that
-something arrived. The fixed schedule removes this too.
+something arrived, and over weeks those times can be intersected with the
+blocks that carried shielded outputs. zcash-devtool therefore runs on a fixed
+schedule by default (`--every 300`): it fetches every five minutes whether or
+not anything arrived. `--once` fetches once and exits; it leaks the time of
+the fetch, and the docs and help text say so.
+
+**History before Ironwood.** Transactions mined before Ironwood activation are
+not in the database. In Blindfetch mode zcash-devtool leaves them pending; it
+never falls back to lightwalletd for them unless `--allow-fallback` is given.
 
 **Network address.** PIR does nothing for the IP address. Run the client over
 Tor or a relay if that matters. The server does not log addresses. The public
