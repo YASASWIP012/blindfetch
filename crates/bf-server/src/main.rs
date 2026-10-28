@@ -70,6 +70,9 @@ struct AppState {
     db: RwLock<Arc<Db>>,
     seen: Mutex<VecDeque<Seen>>,
     batch: usize,
+    /// Each query scans the whole database; two rounds at a time keep a small
+    /// machine responsive.
+    busy: tokio::sync::Semaphore,
 }
 
 impl AppState {
@@ -91,6 +94,13 @@ fn load(dir: &Path, batch: usize) -> anyhow::Result<Db> {
     let index_bytes = std::fs::read(dir.join("index.bin")).context("read index.bin")?;
     let index = Index::decode(&index_bytes)?;
     let rows = std::fs::read(dir.join("rows.bin")).context("read rows.bin")?;
+    // A rows.bin that does not match its index (a half-written file, a bad
+    // disk) would make every honest wallet lock this server out. Check every
+    // row before serving any.
+    anyhow::ensure!(rows.len() == index.num_rows() * ROW_BYTES, "rows.bin has the wrong size");
+    for (i, row) in rows.chunks_exact(ROW_BYTES).enumerate() {
+        anyhow::ensure!(index.check_row(i, row), "rows.bin row {i} does not match index.bin");
+    }
     let scenario = Scenario::new(index.num_rows(), ROW_BYTES);
     let info = wire::Info {
         network: index.network,
@@ -160,6 +170,9 @@ async fn query(State(app): State<Arc<AppState>>, headers: HeaderMap, body: Bytes
     if parts.len() != app.batch {
         return (StatusCode::BAD_REQUEST, format!("send exactly {} queries", app.batch)).into_response();
     }
+    let Ok(_permit) = app.busy.acquire().await else {
+        return (StatusCode::SERVICE_UNAVAILABLE, "shutting down").into_response();
+    };
     let owned: Vec<Vec<u8>> = parts.iter().map(|p| p.to_vec()).collect();
     let db2 = db.clone();
     // Queries in a round are independent; answer them on separate cores.
@@ -231,6 +244,7 @@ async fn main() -> anyhow::Result<()> {
         db: RwLock::new(Arc::new(db)),
         seen: Mutex::new(VecDeque::new()),
         batch: cli.batch,
+        busy: tokio::sync::Semaphore::new(2),
     });
     spawn_reloader(app.clone(), cli.data.clone(), Duration::from_secs(cli.reload_secs));
 
@@ -242,7 +256,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/query", post(query))
         .route("/v1/seen", get(seen))
         .route("/healthz", get(|| async { "ok" }))
-        .layer(DefaultBodyLimit::max(64 << 20))
+        // A round is about 3 MiB at the largest database size; allow headroom.
+        .layer(DefaultBodyLimit::max(8 << 20))
         .layer(CorsLayer::permissive().expose_headers([header::HeaderName::from_static("x-db-version")]))
         .with_state(app);
 

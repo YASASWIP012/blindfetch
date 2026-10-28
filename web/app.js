@@ -9,6 +9,8 @@ const SERVERS = LOCAL
 const REPO = 'https://github.com/YASASWIP012/blindfetch';
 
 const $ = (id) => document.getElementById(id);
+// Everything shown comes from the server or the chain; escape it.
+const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 let net = 'main';
 let session = null;
 let seenTimer = null;
@@ -38,14 +40,14 @@ async function connect() {
       ['Rows', `${fmtNum(info.num_rows)} × ${fmtBytes(info.row_bytes)}`],
       ['Index', fmtBytes(indexBuf.length)],
       ['Queries per round', info.batch],
-    ].map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
+    ].map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('');
     renderRecent();
     $('go').disabled = false;
     // ?auto fetches the newest transaction straight away, for links that
     // should show the whole round trip without a click.
     if (new URLSearchParams(location.search).has('auto')) fetchPrivately();
   } catch (e) {
-    $('status').textContent = `Could not reach the ${net === 'main' ? 'mainnet' : 'testnet'} server: ${e.message || e}`;
+    $('status').textContent = `Could not reach the server: ${e.message || e}. It runs on a laptop and may be asleep; the README shows how to run your own.`;
   }
   pollSeen();
 }
@@ -53,7 +55,7 @@ async function connect() {
 function renderRecent() {
   const list = session.recent(6);
   $('recent').innerHTML = '<span class="muted">Recent:</span> ' + list.map((e) =>
-    `<button class="chip" data-h="${e.height}" data-i="${e.tx_index}">${fmtNum(e.height)} · #${e.tx_index} · ${fmtBytes(e.len)}</button>`
+    `<button class="chip" data-h="${esc(e.height)}" data-i="${esc(e.tx_index)}">${esc(fmtNum(e.height))} · #${esc(e.tx_index)} · ${esc(fmtBytes(e.len))}</button>`
   ).join('');
   for (const b of $('recent').querySelectorAll('button')) {
     b.onclick = () => { $('h').value = b.dataset.h; $('i').value = b.dataset.i; $('txid').value = ''; };
@@ -96,15 +98,19 @@ async function fetchPrivately() {
         <div><dt>Round trip</dt><dd>${Math.round(t2 - t1)} ms</dd></div>
         <div><dt>Opened</dt><dd>${Math.round(t3 - t2)} ms</dd></div>
       </dl>
-      <p><strong>txid</strong> <code class="wrapcode">${tx.txid}</code></p>
+      <p><strong>txid</strong> <code class="wrapcode">${esc(tx.txid)}</code></p>
       <p>${check}</p>
-      <p class="muted">${tx.version}, ${fmtBytes(tx.stripped_bytes)} without proofs. ${tx.ironwood_actions} Ironwood action(s), ${tx.orchard_actions} Orchard, ${tx.sapling_outputs} Sapling output(s), ${tx.transparent_inputs} transparent in, ${tx.transparent_outputs} out.</p>
-      ${tx.ironwood_ciphertexts.length ? `<p class="muted">Encrypted notes, which a wallet would now decrypt for the memo:</p><pre class="log">${tx.ironwood_ciphertexts.map((c, k) => `action ${k}: ${c}…`).join('\n')}</pre>` : ''}`;
+      <p class="muted">${esc(tx.version)}, ${esc(fmtBytes(tx.stripped_bytes))} stored. ${esc(tx.ironwood_actions)} Ironwood action(s), ${esc(tx.orchard_actions)} Orchard, ${esc(tx.sapling_outputs)} Sapling output(s), ${esc(tx.transparent_inputs)} transparent in, ${esc(tx.transparent_outputs)} out.</p>
+      ${tx.ironwood_ciphertexts.length ? `<p class="muted">Encrypted notes, which a wallet would now decrypt for the memo:</p><pre class="log">${tx.ironwood_ciphertexts.map((c, k) => `action ${k}: ${esc(c)}…`).join('\n')}</pre>` : ''}`;
     $('stock').textContent =
       `rpc GetTransaction(TxFilter)\n  hash: ${tx.txid}\n\nThe server now knows this wallet\nreceived ${tx.txid.slice(0, 16)}…`;
     pollSeen(true);
   } catch (e) {
-    out.innerHTML = `<p class="bad">${e.message || e}</p>`;
+    out.textContent = '';
+    const msg = document.createElement('p');
+    msg.className = 'bad';
+    msg.textContent = String(e.message || e);
+    out.appendChild(msg);
   } finally {
     $('go').disabled = false;
   }

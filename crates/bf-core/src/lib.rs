@@ -32,6 +32,10 @@ pub const MIN_ROWS: usize = 2048;
 /// the server cannot count how many transactions a wallet is fetching.
 pub const DEFAULT_BATCH: usize = 4;
 
+/// Largest database a client accepts: 2^20 rows of 32 KiB is 32 GiB, far
+/// beyond the chain, and small enough that row arithmetic cannot overflow.
+pub const MAX_ROWS: usize = 1 << 20;
+
 /// Every fetch sends at least this many rounds, so that a wallet needing one
 /// row and a wallet needing eight look the same.
 pub const MIN_ROUNDS: usize = 2;

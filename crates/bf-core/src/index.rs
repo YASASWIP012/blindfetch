@@ -180,8 +180,13 @@ impl Index {
         let mut entries = Vec::new();
         let mut height = u64::from(first_height);
         let mut offset = 0u64;
-        for _ in 0..num_blocks {
-            height += next(&mut pos)?;
+        for b in 0..num_blocks {
+            let delta = next(&mut pos)?;
+            // Blocks are listed in strictly increasing height order.
+            if b > 0 && delta == 0 {
+                return Err(IndexError::Malformed);
+            }
+            height = height.checked_add(delta).ok_or(IndexError::Malformed)?;
             let count = next(&mut pos)?;
             let mut last_index: Option<u64> = None;
             for _ in 0..count {
@@ -191,6 +196,9 @@ impl Index {
                     return Err(IndexError::Malformed);
                 }
                 last_index = Some(tx_index);
+                if offset.checked_add(len).is_none_or(|end| end > (crate::MAX_ROWS * ROW_BYTES) as u64) {
+                    return Err(IndexError::Malformed);
+                }
                 entries.push(Entry {
                     key: TxKey {
                         height: u32::try_from(height).map_err(|_| IndexError::Malformed)?,
@@ -205,7 +213,10 @@ impl Index {
         if height > u64::from(last_height) {
             return Err(IndexError::Malformed);
         }
-        let num_rows = next(&mut pos)? as usize;
+        let num_rows = usize::try_from(next(&mut pos)?).map_err(|_| IndexError::Malformed)?;
+        if num_rows > crate::MAX_ROWS {
+            return Err(IndexError::Malformed);
+        }
         let hashes = buf.get(pos..).ok_or(IndexError::Malformed)?;
         if hashes.len() != num_rows.checked_mul(16).ok_or(IndexError::Malformed)? {
             return Err(IndexError::Malformed);

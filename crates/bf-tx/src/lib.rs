@@ -97,9 +97,14 @@ fn zero_auth(tx: Transaction) -> Result<Vec<u8>, Error> {
 
     let txid = tx.txid();
     if matches!(tx.version(), TxVersion::V4) {
-        // v4 txids cover Sapling proofs, so nothing can be dropped.
+        // v4 txids cover Sapling proofs, so nothing can be dropped. Check the
+        // re-encoding anyway, like every other path.
         let mut raw = Vec::new();
         tx.write(&mut raw)?;
+        let actual = Transaction::read(&raw[..], tx.consensus_branch_id())?.txid();
+        if actual != txid {
+            return Err(Error::TxidMismatch { expected: txid, actual });
+        }
         return Ok(bf_core::zeros::encode(&raw));
     }
 

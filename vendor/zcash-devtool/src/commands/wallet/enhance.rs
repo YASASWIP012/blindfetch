@@ -160,15 +160,33 @@ impl Command {
             }
             let mut bf = bf_client::Blindfetch::connect(url).await?;
             let info = bf.info().clone();
+            // A database version ahead of the wallet's own view of the chain
+            // can only be a per-client tag.
+            anyhow::ensure!(
+                BlockHeight::from_u32(info.last_height) <= chain_tip,
+                "the server claims height {} but this wallet's chain tip is {chain_tip}; refusing",
+                info.last_height
+            );
             println!(
                 "Blindfetch: {} transactions, heights {}..={}, {} rows, {} queries per round",
                 info.transactions, info.first_height, info.last_height, info.num_rows, info.batch
             );
 
+            // Ticks fall on fixed deadlines, however long a tick's work takes.
+            let mut ticks = self
+                .every
+                .map(|secs| tokio::time::interval(std::time::Duration::from_secs(secs.max(1))));
+            // Set once the server fails a check. From then on every tick is
+            // dummies only, so the server cannot see that anything changed.
+            let mut caught = false;
+
             loop {
+                if let Some(t) = ticks.as_mut() {
+                    t.tick().await;
+                }
                 let mut wants = Vec::new();
                 let mut unlocated = Vec::new();
-                for request in db_data.transaction_data_requests()? {
+                for request in if caught { vec![] } else { db_data.transaction_data_requests()? } {
                     if let TransactionDataRequest::Enhancement(txid) = &request {
                         if satisfied_requests.contains(&request) {
                             continue;
@@ -195,7 +213,14 @@ impl Command {
                         use std::io::Write as _;
                         let mut f = std::fs::OpenOptions::new().create(true).append(true).open(&lock)?;
                         writeln!(f, "{url}")?;
-                        return Err(e);
+                        eprintln!("ALERT: {e}. Locked out in {}.", lock.display());
+                        if self.every.is_none() {
+                            return Err(e);
+                        }
+                        // Keep the same schedule with dummies only, so the
+                        // server cannot tell which wallet it caught out.
+                        caught = true;
+                        continue;
                     }
                     Err(e) => return Err(e),
                 };
@@ -207,14 +232,21 @@ impl Command {
                     match result {
                         bf_client::Fetched::Found(tx) => {
                             info!("Enhancing tx {:?} from Blindfetch", want.txid);
-                            decrypt_and_store_transaction(
+                            // A local storage error (say, the database is busy
+                            // with a sync) must not change the schedule: log
+                            // it and try this transaction again next tick.
+                            match decrypt_and_store_transaction(
                                 &params,
                                 &mut db_data,
                                 &tx,
                                 Some(BlockHeight::from_u32(want.key.height)),
-                            )?;
-                            satisfied_requests.insert(TransactionDataRequest::Enhancement(want.txid));
-                            fetched += 1;
+                            ) {
+                                Ok(_) => {
+                                    satisfied_requests.insert(TransactionDataRequest::Enhancement(want.txid));
+                                    fetched += 1;
+                                }
+                                Err(e) => eprintln!("Could not store {}: {e}; will retry", want.txid),
+                            }
                         }
                         bf_client::Fetched::NotCovered => not_covered.push(want.txid),
                         bf_client::Fetched::Deferred => waiting += 1,
@@ -237,16 +269,18 @@ impl Command {
                 }
                 println!("lightwalletd was not asked for any of them.");
 
-                if !self.allow_fallback {
-                    for txid in &not_covered {
-                        println!("Not in the Blindfetch database, left for later: {txid}");
+                for txid in &not_covered {
+                    println!("Not in the Blindfetch database yet, left for later: {txid}");
+                    // In one-shot mode, keep the lightwalletd loop below from
+                    // asking for it. On a schedule, leave it pending so a later
+                    // tick fetches it once the server has indexed it.
+                    if !self.allow_fallback && self.every.is_none() {
                         satisfied_requests.insert(TransactionDataRequest::Enhancement(*txid));
                     }
                 }
 
-                match self.every {
-                    Some(secs) => tokio::time::sleep(std::time::Duration::from_secs(secs)).await,
-                    None => break,
+                if self.every.is_none() {
+                    break;
                 }
             }
         }

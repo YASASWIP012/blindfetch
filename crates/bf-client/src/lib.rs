@@ -96,6 +96,8 @@ impl Blindfetch {
             info.batch,
             bf_core::MIN_BATCH
         );
+        ensure!(matches!(info.poly_len, 2048 | 4096), "unsupported YPIR ring dimension {}", info.poly_len);
+        ensure!(info.num_rows <= bf_core::MAX_ROWS, "database too large: {} rows", info.num_rows);
         let mut scenario = Scenario::new(info.num_rows, info.row_bytes);
         scenario.poly_len = info.poly_len;
         Ok(Blindfetch { base, http, info, index, pir: Pir::new(scenario) })
@@ -231,14 +233,29 @@ impl Blindfetch {
 
         let mut rows = std::collections::HashMap::new();
         let mut stats = Vec::new();
+        // Send every planned round even after one fails, so the server sees
+        // the same traffic either way, and only then report the failure.
+        let mut failed: Option<anyhow::Error> = None;
         for batch in &plan.batches {
-            let (got, s) = self.round(&batch.rows, batch.real_count()).await?;
-            for ((r, bytes), real) in batch.rows.iter().zip(got).zip(&batch.real) {
-                if *real {
-                    rows.insert(*r, bytes);
+            match self.round(&batch.rows, batch.real_count()).await {
+                Ok((got, s)) => {
+                    for ((r, bytes), real) in batch.rows.iter().zip(got).zip(&batch.real) {
+                        if *real {
+                            rows.insert(*r, bytes);
+                        }
+                    }
+                    stats.push(s);
+                }
+                // A rebuilt database is not the server misbehaving; stop and
+                // let the caller reconnect.
+                Err(e) if e.to_string().contains("rebuilt its database") => return Err(e),
+                Err(e) => {
+                    failed.get_or_insert(e);
                 }
             }
-            stats.push(s);
+        }
+        if let Some(e) = failed {
+            return Err(e);
         }
 
         let mut out = Vec::with_capacity(located.len());

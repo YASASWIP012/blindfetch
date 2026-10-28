@@ -195,6 +195,12 @@ async fn sync(net: Net, first_height: u32, dir: &std::path::Path, server: &str, 
                 let back = start.saturating_sub(100).max(first_height);
                 tracing::warn!(at = start, rewind_to = back, "chain does not link up; rewinding");
                 store.rewind(back)?;
+                // Re-anchor the link check on the block just below the rewind.
+                if back > first_height
+                    && let Ok(b) = lwd::blocks(&mut client, back - 1, back - 1).await
+                {
+                    store.set_last_hash(&b[0].hash)?;
+                }
                 continue;
             }
 
@@ -289,19 +295,29 @@ struct Stats {
     database_bytes: u64,
     index_bytes: usize,
     largest_tx_bytes: u32,
+    /// Records an older build stored that could not be re-stripped. They are
+    /// served as stored, still checked against their txids by wallets.
+    unslimmed: usize,
 }
 
 fn build(net: Net, first_height: u32, dir: &std::path::Path) -> anyhow::Result<()> {
     let store = Store::open(dir, first_height)?;
     let mut packer = Packer::new(net.core(), first_height);
-    let (mut n, mut mined, mut largest) = (0usize, 0u64, 0u32);
+    let (mut n, mut mined, mut largest, mut unslimmed) = (0usize, 0u64, 0u32, 0usize);
     let params = net.params();
     for rec in store.records()? {
         let rec = rec?;
         // Records from older builds may still carry signatures; drop them
         // now, with the txid checked again. One that fails stays as stored.
         let branch = BranchId::for_height(&params, BlockHeight::from_u32(rec.key.height));
-        let bytes = bf_tx::slim(&rec.bytes, branch).unwrap_or(rec.bytes);
+        let bytes = match bf_tx::slim(&rec.bytes, branch) {
+            Ok(b) => b,
+            Err(e) => {
+                tracing::warn!(height = rec.key.height, index = rec.key.tx_index, "kept as stored: {e}");
+                unslimmed += 1;
+                rec.bytes
+            }
+        };
         largest = largest.max(bytes.len() as u32);
         packer.push(rec.key, &bytes);
         n += 1;
@@ -323,6 +339,7 @@ fn build(net: Net, first_height: u32, dir: &std::path::Path) -> anyhow::Result<(
         database_bytes: rows.len() as u64,
         index_bytes: index_bytes.len(),
         largest_tx_bytes: largest,
+        unslimmed,
     };
 
     write_atomic(&dir.join("rows.bin"), &rows)?;
