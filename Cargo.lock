@@ -692,6 +692,7 @@ dependencies = [
 name = "bf-core"
 version = "0.1.0"
 dependencies = [
+ "blake2b_simd",
  "serde",
  "thiserror 2.0.21",
 ]

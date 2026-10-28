@@ -2,17 +2,27 @@
 //!
 //! PIR hides which row a query asks for, but not how many queries arrive. If
 //! a wallet sent one query per memo, the server would learn how many payments
-//! it just received. So every round is exactly `batch` queries: real rows
-//! first, then dummy rows drawn at random. A wallet with nothing to fetch can
+//! it just received. So every round is exactly `batch` queries: the real rows
+//! plus dummy rows drawn at random. A wallet with nothing to fetch can
 //! still send a full round of dummies, which makes "fetched nothing" look the
-//! same as "fetched eight memos".
+//! same as "fetched four memos".
+//!
+//! Real queries are shuffled in among the dummies, and clients decode and
+//! check every answer, so no slot position and no failure tells the server
+//! which queries mattered.
 
 /// One round of queries. `rows.len()` always equals the plan's batch size.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Batch {
     pub rows: Vec<usize>,
-    /// How many of `rows` (from the front) are real.
-    pub real: usize,
+    /// Which slots the client needs. Only the client knows this.
+    pub real: Vec<bool>,
+}
+
+impl Batch {
+    pub fn real_count(&self) -> usize {
+        self.real.iter().filter(|r| **r).count()
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -42,13 +52,17 @@ impl QueryPlan {
         let rounds = rows.len().div_ceil(batch).max(min_rounds);
         let batches = (0..rounds)
             .map(|i| {
-                let real: Vec<usize> = rows.iter().skip(i * batch).take(batch).copied().collect();
-                let n_real = real.len();
-                let mut out = real;
-                while out.len() < batch {
-                    out.push((random() % num_rows as u64) as usize);
+                let mut slots: Vec<(usize, bool)> =
+                    rows.iter().skip(i * batch).take(batch).map(|&r| (r, true)).collect();
+                while slots.len() < batch {
+                    slots.push(((random() % num_rows as u64) as usize, false));
                 }
-                Batch { rows: out, real: n_real }
+                // Fisher-Yates, so real queries sit in random slots.
+                for j in (1..slots.len()).rev() {
+                    let k = (random() % (j as u64 + 1)) as usize;
+                    slots.swap(j, k);
+                }
+                Batch { rows: slots.iter().map(|s| s.0).collect(), real: slots.iter().map(|s| s.1).collect() }
             })
             .collect();
         QueryPlan { batches }
@@ -77,23 +91,35 @@ mod tests {
     fn every_round_is_full() {
         let plan = QueryPlan::new([5, 9, 9, 40], 2048, 8, 1, counter());
         assert_eq!(plan.batches.len(), 1);
-        assert_eq!(plan.batches[0].rows.len(), 8);
-        assert_eq!(plan.batches[0].real, 3);
-        assert_eq!(&plan.batches[0].rows[..3], &[5, 9, 40]);
+        let b = &plan.batches[0];
+        assert_eq!(b.rows.len(), 8);
+        assert_eq!(b.real_count(), 3);
+        let mut real: Vec<usize> = b.rows.iter().zip(&b.real).filter(|(_, r)| **r).map(|(x, _)| *x).collect();
+        real.sort();
+        assert_eq!(real, [5, 9, 40]);
     }
 
     #[test]
     fn nothing_needed_still_sends_a_round() {
         let plan = QueryPlan::new([], 2048, 8, 1, counter());
         assert_eq!(plan.total_queries(), 8);
-        assert_eq!(plan.batches[0].real, 0);
+        assert_eq!(plan.batches[0].real_count(), 0);
+    }
+
+    #[test]
+    fn real_slots_move() {
+        let mut rng = counter();
+        let firsts: std::collections::HashSet<usize> = (0..50)
+            .map(|_| QueryPlan::new([7], 2048, 4, 1, &mut rng).batches[0].real.iter().position(|r| *r).unwrap())
+            .collect();
+        assert!(firsts.len() > 1, "the real query always sat in the same slot");
     }
 
     #[test]
     fn spills_into_more_rounds() {
         let plan = QueryPlan::new(0..19, 2048, 8, 1, counter());
         assert_eq!(plan.batches.len(), 3);
-        assert_eq!(plan.batches.iter().map(|b| b.real).collect::<Vec<_>>(), [8, 8, 3]);
+        assert_eq!(plan.batches.iter().map(|b| b.real_count()).collect::<Vec<_>>(), [8, 8, 3]);
         assert!(plan.batches.iter().all(|b| b.rows.len() == 8 && b.rows.iter().all(|&r| r < 2048)));
     }
 }

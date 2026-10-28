@@ -25,7 +25,8 @@ pub struct Session {
     index: Index,
     pir: Pir,
     pending: Vec<Pending>,
-    target: Option<(Entry, usize)>,
+    /// The entry being fetched, and the round's row numbers and real slots.
+    target: Option<(Entry, Vec<usize>, Vec<bool>)>,
 }
 
 #[derive(Serialize)]
@@ -81,6 +82,9 @@ impl Session {
         if index.last_height != info.last_height || index.num_rows() != info.num_rows {
             return Err(err("index does not match server info"));
         }
+        if info.batch < bf_core::MIN_BATCH || info.row_bytes != bf_core::ROW_BYTES {
+            return Err(err("server parameters would weaken privacy; refusing"));
+        }
         let mut scenario = Scenario::new(info.num_rows, info.row_bytes);
         scenario.poly_len = info.poly_len;
         Ok(Session { info, index, pir: Pir::new(scenario), pending: Vec::new(), target: None })
@@ -124,7 +128,7 @@ impl Session {
         let plan = QueryPlan::new(rows.iter().copied(), self.info.num_rows, self.info.batch, 1, random_u64);
         let batch = &plan.batches[0];
         self.pending = batch.rows.iter().map(|&r| self.pir.query(r)).collect::<Result<_, _>>().map_err(err)?;
-        self.target = Some((entry, batch.real));
+        self.target = Some((entry, batch.rows.clone(), batch.real.clone()));
         Ok(wire::encode_parts(&self.pending.iter().map(|p| p.payload.as_slice()).collect::<Vec<_>>()))
     }
 
@@ -133,20 +137,33 @@ impl Session {
     /// hex), also says whether it matches.
     #[wasm_bindgen(js_name = openRound)]
     pub fn open_round(&mut self, response: &[u8], expected_txid: Option<String>) -> Result<JsValue, JsError> {
-        let (entry, real) = self.target.take().ok_or_else(|| err("no round in flight"))?;
-        let parts = wire::decode_parts(response).ok_or_else(|| err("malformed response"))?;
+        const UNTRUSTED: &str = "the server returned data that does not match its index; stop using it";
+        let (entry, row_ids, real) = self.target.take().ok_or_else(|| err("no round in flight"))?;
+        let parts = wire::decode_parts(response).ok_or_else(|| err(UNTRUSTED))?;
         let pending = std::mem::take(&mut self.pending);
         if parts.len() != pending.len() {
-            return Err(err("server answered the wrong number of queries"));
+            return Err(err(UNTRUSTED));
         }
-        let rows: Vec<Vec<u8>> = pending
-            .into_iter()
-            .zip(parts)
-            .take(real)
-            .map(|(p, a)| self.pir.decode(p, a))
-            .collect::<Result<_, _>>()
-            .map_err(err)?;
-        let bytes = entry.extract(&rows).ok_or_else(|| err("rows did not hold the transaction"))?;
+        // Decode and check every slot, dummies too, so a corrupted dummy fails
+        // exactly like a corrupted real row.
+        let mut rows: Vec<(usize, Vec<u8>)> = Vec::new();
+        let mut ok = true;
+        for (((p, a), &r), &is_real) in pending.into_iter().zip(parts).zip(&row_ids).zip(&real) {
+            match self.pir.decode(p, a) {
+                Ok(row) if self.index.check_row(r, &row) => {
+                    if is_real {
+                        rows.push((r, row));
+                    }
+                }
+                _ => ok = false,
+            }
+        }
+        if !ok {
+            return Err(err(UNTRUSTED));
+        }
+        rows.sort_by_key(|(r, _)| *r);
+        let rows: Vec<Vec<u8>> = rows.into_iter().map(|(_, row)| row).collect();
+        let bytes = entry.extract(&rows).ok_or_else(|| err(UNTRUSTED))?;
         let branch = BranchId::for_height(&params(&self.info), BlockHeight::from_u32(entry.key.height));
         let tx = Transaction::read(&bf_tx::expand(&bytes).map_err(err)?[..], branch).map_err(err)?;
         let txid = tx.txid();
@@ -178,7 +195,7 @@ impl Session {
                 .map(|b| {
                     b.actions()
                         .iter()
-                        .map(|a| hex::encode(&a.encrypted_note().enc_ciphertext[..24]))
+                        .map(|a| hex::encode(&a.encrypted_note().enc_ciphertext.as_ref()[..24]))
                         .collect()
                 })
                 .unwrap_or_default(),

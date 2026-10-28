@@ -8,6 +8,6 @@
   "rows": 2048,
   "row_bytes": 32768,
   "database_bytes": 67108864,
-  "index_bytes": 15580,
+  "index_bytes": 48350,
   "largest_tx_bytes": 39040
 }

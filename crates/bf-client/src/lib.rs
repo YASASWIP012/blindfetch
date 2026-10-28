@@ -21,6 +21,11 @@ use zcash_protocol::consensus::{BlockHeight, BranchId, Parameters};
 
 pub use bf_core::wire::Info;
 
+/// The only error a misbehaving server can cause. Wallets should stop using
+/// that server and not retry automatically: retrying would let it probe.
+pub const UNTRUSTED: &str =
+    "the Blindfetch server returned data that does not match its index or the chain; stop using it";
+
 /// What one round trip cost, for the measurements the demo reports.
 #[derive(Clone, Debug, Default)]
 pub struct RoundStats {
@@ -83,6 +88,12 @@ impl Blindfetch {
             "server's index does not match its info; try again"
         );
         ensure!(info.row_bytes == bf_core::ROW_BYTES, "unsupported row size {}", info.row_bytes);
+        ensure!(
+            info.batch >= bf_core::MIN_BATCH,
+            "server asks for rounds of {} queries; refusing anything under {}",
+            info.batch,
+            bf_core::MIN_BATCH
+        );
         let mut scenario = Scenario::new(info.num_rows, info.row_bytes);
         scenario.poly_len = info.poly_len;
         Ok(Blindfetch { base, http, info, index, pir: Pir::new(scenario) })
@@ -100,8 +111,12 @@ impl Blindfetch {
         self.index.get(key)
     }
 
-    /// Sends one round of exactly `batch` queries and returns the rows asked
-    /// for, in the order of `rows`.
+    /// Sends one round of exactly `batch` queries and returns every row, real
+    /// or dummy, after checking each against the index.
+    ///
+    /// Any mismatch is the same error whatever the slot, and the caller must
+    /// stop using the server. A server that corrupts one answer to see whether
+    /// the client notices learns nothing, because dummies are checked too.
     async fn round(&self, rows: &[usize], real: usize) -> anyhow::Result<(Vec<Vec<u8>>, RoundStats)> {
         let started = Instant::now();
         let pending: Vec<_> = rows.iter().map(|&r| self.pir.query(r)).collect::<anyhow::Result<_>>()?;
@@ -116,12 +131,20 @@ impl Blindfetch {
             .await?;
         ensure!(resp.status() != reqwest::StatusCode::CONFLICT, "the server rebuilt its database; reconnect");
         let resp = resp.error_for_status()?.bytes().await?;
-        let parts = wire::decode_parts(&resp).ok_or_else(|| anyhow!("malformed response"))?;
-        ensure!(parts.len() == pending.len(), "server answered {} of {} queries", parts.len(), pending.len());
-        let mut out = Vec::with_capacity(real);
-        for (p, answer) in pending.into_iter().zip(parts).take(real) {
-            out.push(self.pir.decode(p, answer)?);
+        let parts = wire::decode_parts(&resp).ok_or_else(|| anyhow!(UNTRUSTED))?;
+        ensure!(parts.len() == pending.len(), UNTRUSTED);
+        let mut out = Vec::with_capacity(rows.len());
+        let mut ok = true;
+        for ((p, answer), &r) in pending.into_iter().zip(parts).zip(rows) {
+            match self.pir.decode(p, answer) {
+                Ok(row) if self.index.check_row(r, &row) => out.push(row),
+                _ => {
+                    ok = false;
+                    out.push(Vec::new());
+                }
+            }
         }
+        ensure!(ok, UNTRUSTED);
         let stats = RoundStats {
             queries: rows.len(),
             real,
@@ -149,14 +172,16 @@ impl Blindfetch {
     ) -> anyhow::Result<(Vec<(Want, Fetched)>, Vec<RoundStats>)> {
         let located: Vec<(Want, Option<Entry>)> = wants.iter().map(|w| (*w, self.locate(w.key))).collect();
         let needed = located.iter().filter_map(|(_, e)| *e).flat_map(|e| e.rows());
-        let plan = QueryPlan::new(needed, self.info.num_rows, self.info.batch, 1, random_u64);
+        let plan = QueryPlan::new(needed, self.info.num_rows, self.info.batch, bf_core::MIN_ROUNDS, random_u64);
 
         let mut rows = std::collections::HashMap::new();
         let mut stats = Vec::new();
         for batch in &plan.batches {
-            let (got, s) = self.round(&batch.rows, batch.real).await?;
-            for (r, bytes) in batch.rows.iter().zip(got) {
-                rows.insert(*r, bytes);
+            let (got, s) = self.round(&batch.rows, batch.real_count()).await?;
+            for ((r, bytes), real) in batch.rows.iter().zip(got).zip(&batch.real) {
+                if *real {
+                    rows.insert(*r, bytes);
+                }
             }
             stats.push(s);
         }
@@ -168,10 +193,11 @@ impl Blindfetch {
                 continue;
             };
             let parts: Vec<Vec<u8>> = entry.rows().map(|r| rows[&r].clone()).collect();
-            let bytes = entry.extract(&parts).ok_or_else(|| anyhow!("rows did not hold the transaction"))?;
+            // Rows matched the index, so a bad transaction here means the
+            // index itself lies. Same error, same response: stop.
+            let bytes = entry.extract(&parts).ok_or_else(|| anyhow!(UNTRUSTED))?;
             let branch = BranchId::for_height(params, BlockHeight::from_u32(want.key.height));
-            let tx = bf_tx::verify(&bytes, want.txid, branch)
-                .with_context(|| format!("transaction at {:?} failed its txid check", want.key))?;
+            let tx = bf_tx::verify(&bytes, want.txid, branch).map_err(|_| anyhow!(UNTRUSTED))?;
             out.push((want, Fetched::Found(Box::new(tx))));
         }
         Ok((out, stats))

@@ -15,14 +15,31 @@
 //! n       number of blocks that have entries
 //! per block: height delta from the previous listed block (or from the
 //!            first height), entry count, then per entry: tx index, length
+//! n       number of rows
+//! [16]*n  BLAKE2b-128 of each row, personalised "Blindfetch_row_1"
 //! ```
+//!
+//! The row hashes let a client check every row it decodes, including the
+//! dummies it never needed. Without them a server could corrupt one answer
+//! and watch whether the client noticed, which would show which queries were
+//! real.
 
 use std::ops::Range;
 
 use crate::{Network, ROW_BYTES, row_count, varint};
 
 const MAGIC: &[u8; 4] = b"BFIX";
-const VERSION: u8 = 1;
+const VERSION: u8 = 2;
+const ROW_PERSONAL: &[u8; 16] = b"Blindfetch_row_1";
+const INDEX_PERSONAL: &[u8; 16] = b"Blindfetch_idx_1";
+
+pub type RowHash = [u8; 16];
+
+/// The commitment to one row that the index carries.
+pub fn row_hash(row: &[u8]) -> RowHash {
+    let h = blake2b_simd::Params::new().hash_length(16).personal(ROW_PERSONAL).hash(row);
+    h.as_bytes().try_into().unwrap()
+}
 
 /// Identifies a mined transaction by where it is, which is what a wallet that
 /// scanned compact blocks already knows.
@@ -80,6 +97,7 @@ pub struct Index {
     pub first_height: u32,
     pub last_height: u32,
     entries: Vec<Entry>,
+    row_hashes: Vec<RowHash>,
 }
 
 impl Index {
@@ -104,6 +122,19 @@ impl Index {
         row_count(self.stream_len())
     }
 
+    /// Whether `row` is what the index committed to for row number `i`.
+    pub fn check_row(&self, i: usize, row: &[u8]) -> bool {
+        self.row_hashes.get(i).is_some_and(|h| *h == row_hash(row))
+    }
+
+    /// A short fingerprint of the whole index. Two servers built from the
+    /// same chain produce the same bytes, so clients can compare fingerprints
+    /// across operators.
+    pub fn digest(&self) -> [u8; 32] {
+        let h = blake2b_simd::Params::new().hash_length(32).personal(INDEX_PERSONAL).hash(&self.encode());
+        h.as_bytes().try_into().unwrap()
+    }
+
     pub fn encode(&self) -> Vec<u8> {
         let mut out = Vec::with_capacity(16 + self.entries.len() * 4);
         out.extend_from_slice(MAGIC);
@@ -124,6 +155,10 @@ impl Index {
                 varint::write(&mut out, u64::from(e.key.tx_index));
                 varint::write(&mut out, u64::from(e.len));
             }
+        }
+        varint::write(&mut out, self.row_hashes.len() as u64);
+        for h in &self.row_hashes {
+            out.extend_from_slice(h);
         }
         out
     }
@@ -167,10 +202,20 @@ impl Index {
                 offset += len;
             }
         }
-        if pos != buf.len() || height > u64::from(last_height) {
+        if height > u64::from(last_height) {
             return Err(IndexError::Malformed);
         }
-        Ok(Index { network, first_height, last_height, entries })
+        let num_rows = next(&mut pos)? as usize;
+        let hashes = buf.get(pos..).ok_or(IndexError::Malformed)?;
+        if hashes.len() != num_rows.checked_mul(16).ok_or(IndexError::Malformed)? {
+            return Err(IndexError::Malformed);
+        }
+        let row_hashes = hashes.chunks_exact(16).map(|c| c.try_into().unwrap()).collect();
+        let index = Index { network, first_height, last_height, entries, row_hashes };
+        if index.num_rows() != num_rows {
+            return Err(IndexError::Malformed);
+        }
+        Ok(index)
     }
 }
 
@@ -208,14 +253,16 @@ impl Packer {
 
     /// The index and the database rows, padded to YPIR's minimum row count.
     pub fn finish(self) -> (Index, Vec<u8>) {
-        let index = Index {
+        let mut index = Index {
             network: self.network,
             first_height: self.first_height,
             last_height: self.last_height,
             entries: self.entries,
+            row_hashes: Vec::new(),
         };
         let mut rows = self.stream;
         rows.resize(index.num_rows() * ROW_BYTES, 0);
+        index.row_hashes = rows.chunks_exact(ROW_BYTES).map(row_hash).collect();
         (index, rows)
     }
 }
@@ -251,8 +298,8 @@ mod tests {
         let bytes = index.encode();
         assert_eq!(Index::decode(&bytes).unwrap(), index);
         assert_eq!(index.last_height, 300);
-        // A few bytes per transaction, not a txid's worth.
-        assert!(bytes.len() < 14 + 4 * 6 + 4);
+        // A few bytes per transaction, not a txid's worth, plus 16 per row.
+        assert!(bytes.len() < 14 + 4 * 6 + 4 + 3 + 16 * MIN_ROWS);
     }
 
     #[test]
@@ -266,6 +313,10 @@ mod tests {
                 .collect();
             assert_eq!(&entry.extract(&rows).unwrap(), tx);
         }
+        for (i, row) in db.chunks_exact(ROW_BYTES).enumerate() {
+            assert!(index.check_row(i, row));
+        }
+        assert!(!index.check_row(0, &[0u8; ROW_BYTES]));
         // The row-sized transaction starts mid-row and spans two rows.
         assert_eq!(index.get(key(100, 4)).unwrap().rows(), 0..2);
         assert_eq!(index.get(key(101, 0)), None);

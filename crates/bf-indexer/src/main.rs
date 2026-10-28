@@ -169,7 +169,16 @@ async fn sync(net: Net, first_height: u32, dir: &std::path::Path, server: &str, 
         while store.next_height() <= target {
             let start = store.next_height();
             let end = (start + chunk - 1).min(target);
-            let blocks = lwd::blocks(&mut client, start, end).await?;
+            let blocks = match lwd::blocks(&mut client, start, end).await {
+                Ok(b) => b,
+                Err(e) if follow => {
+                    tracing::warn!("block range {start}..={end} failed, retrying: {e:#}");
+                    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                    client = lwd::connect(server).await.unwrap_or(client);
+                    continue;
+                }
+                Err(e) => return Err(e),
+            };
 
             let wanted: Vec<(TxKey, Vec<u8>)> = blocks
                 .iter()

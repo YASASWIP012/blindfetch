@@ -32,6 +32,14 @@ pub const MIN_ROWS: usize = 2048;
 /// the server cannot count how many transactions a wallet is fetching.
 pub const DEFAULT_BATCH: usize = 4;
 
+/// Every fetch sends at least this many rounds, so that a wallet needing one
+/// row and a wallet needing eight look the same.
+pub const MIN_ROUNDS: usize = 2;
+
+/// Clients refuse servers that ask for smaller rounds than this. Otherwise a
+/// server could advertise a round size of one and count real queries.
+pub const MIN_BATCH: usize = 4;
+
 /// Which chain an index or database describes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]

@@ -22,7 +22,11 @@ pub type Client = CompactTxStreamerClient<Channel>;
 pub async fn connect(url: &str) -> anyhow::Result<Client> {
     let uri: tonic::transport::Uri = url.parse().with_context(|| format!("bad server URL {url}"))?;
     let host = uri.host().ok_or_else(|| anyhow!("server URL has no host"))?.to_string();
-    let channel = Channel::from_shared(url.to_string())?;
+    // A dropped connection must fail, not hang the sync forever.
+    let channel = Channel::from_shared(url.to_string())?
+        .connect_timeout(std::time::Duration::from_secs(20))
+        .timeout(std::time::Duration::from_secs(120))
+        .tcp_keepalive(Some(std::time::Duration::from_secs(30)));
     let channel = if uri.scheme_str() == Some("https") {
         channel.tls_config(
             ClientTlsConfig::new()

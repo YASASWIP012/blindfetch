@@ -125,8 +125,9 @@ impl Command {
 
         let mut satisfied_requests = BTreeSet::new();
 
+        let strict = self.blindfetch.is_some() && !self.allow_fallback;
         if let Some(url) = &self.blindfetch {
-            let bf = bf_client::Blindfetch::connect(url).await?;
+            let mut bf = bf_client::Blindfetch::connect(url).await?;
             let info = bf.info();
             println!(
                 "Blindfetch: {} transactions, heights {}..={}, {} rows, {} queries per round",
@@ -144,7 +145,15 @@ impl Command {
                 }
             }
 
-            let (results, rounds) = bf.fetch(&params, &wants).await?;
+            // A rebuilt database is the one failure worth retrying, once. Any
+            // other failure means the server misbehaved: stop, do not probe.
+            let (results, rounds) = match bf.fetch(&params, &wants).await {
+                Err(e) if e.to_string().contains("rebuilt its database") => {
+                    bf = bf_client::Blindfetch::connect(url).await?;
+                    bf.fetch(&params, &wants).await?
+                }
+                other => other?,
+            };
             let mut not_covered = unlocated;
             for (want, fetched) in results {
                 match fetched {
@@ -207,6 +216,10 @@ impl Command {
                             });
                         info!("Got status {:?}", status);
                         db_data.set_transaction_status(*txid, status)?;
+                    }
+                    TransactionDataRequest::Enhancement(txid) if strict => {
+                        // Asking lightwalletd would name the transaction.
+                        println!("Deferred, not asking lightwalletd: {txid}");
                     }
                     TransactionDataRequest::Enhancement(txid) => {
                         match fetch_transaction(&mut client, &params, chain_tip, *txid).await? {
