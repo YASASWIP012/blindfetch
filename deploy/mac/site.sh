@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 # Builds the demo site and deploys it to Vercel. Vercel proxies /main and
 # /test to the servers, so the public addresses never change even when the
-# tunnels behind them do.
+# tunnels behind them do. server.json carries the tunnel address too, so the
+# page can reach the server directly when the proxy fails.
 # Usage: deploy/mac/site.sh <mainnet-server-url> [testnet-server-url]
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 MAIN="$1"
 TEST="${2:-$1}"
-SITE="$ROOT/.site/blindfetch"
+# Built outside the repository: inside it, Vercel tags the deploy with the
+# last commit's author and blocks it when that author is not on the account.
+SITE="$HOME/.blindfetch-site"
 # One deploy at a time: two would wipe each other's build folder.
 LOCK="$ROOT/.site/deploy.lock"
 mkdir -p "$ROOT/.site"
@@ -16,6 +19,7 @@ trap 'rmdir "$LOCK"' EXIT
 rm -rf "$SITE" && mkdir -p "$SITE/pkg"
 cp "$ROOT"/web/{index.html,app.js,style.css,foundation.css} "$SITE/"
 cp "$ROOT"/web/pkg/bf_wasm.js "$ROOT"/web/pkg/bf_wasm_bg.wasm "$SITE/pkg/"
+printf '{ "main": "%s" }\n' "$MAIN" > "$SITE/server.json"
 cat > "$SITE/vercel.json" <<JSON
 {
   "rewrites": [
@@ -23,6 +27,7 @@ cat > "$SITE/vercel.json" <<JSON
   ],
   "headers": [
     { "source": "/pkg/(.*).wasm", "headers": [{ "key": "Content-Type", "value": "application/wasm" }] },
+    { "source": "/server.json", "headers": [{ "key": "Cache-Control", "value": "no-store" }] },
     { "source": "/(main|test)/(.*)", "headers": [{ "key": "Cache-Control", "value": "no-store" }] }
   ]
 }

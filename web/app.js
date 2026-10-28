@@ -7,6 +7,20 @@ const SERVERS = LOCAL
   ? { main: 'http://127.0.0.1:8484', test: 'http://127.0.0.1:8485' }
   : { main: '/main', test: '/test' };
 
+// If the same-origin proxy is down, server.json names the server's own
+// address and the page talks to it directly.
+async function getInfo() {
+  try {
+    const r = await fetch(`${base()}/v1/info`);
+    if (r.ok) return await r.json();
+  } catch (_) { /* try the direct address */ }
+  if (LOCAL) throw new Error('no server on this machine');
+  const direct = (await (await fetch('server.json', { cache: 'no-store' })).json())[net];
+  if (!direct || direct === SERVERS[net]) throw new Error('the server is not answering');
+  SERVERS[net] = direct;
+  return (await fetch(`${base()}/v1/info`)).json();
+}
+
 const $ = (id) => document.getElementById(id);
 // Everything shown comes from the server or the chain; escape it.
 const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -27,7 +41,7 @@ async function connect() {
   $('status').textContent = 'Downloading the index…';
   try {
     const t0 = performance.now();
-    const info = await (await fetch(`${base()}/v1/info`)).json();
+    const info = await getInfo();
     const indexBuf = new Uint8Array(await (await fetch(`${base()}/v1/index`)).arrayBuffer());
     session = new Session(JSON.stringify(info), indexBuf);
     batch = info.batch;
