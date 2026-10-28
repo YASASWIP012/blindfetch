@@ -1,10 +1,12 @@
 import init, { Session } from './pkg/bf_wasm.js';
 
-const SERVERS = window.BLINDFETCH_SERVERS || {
-  main: 'http://127.0.0.1:8484',
-  test: 'http://127.0.0.1:8485',
-};
-const REPO = window.BLINDFETCH_REPO || '#';
+// On the deployed site the servers sit behind the same origin. Locally they
+// run on their own ports.
+const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
+const SERVERS = LOCAL
+  ? { main: 'http://127.0.0.1:8484', test: 'http://127.0.0.1:8485' }
+  : { main: '/main', test: '/test' };
+const REPO = 'https://github.com/YASASWIP012/blindfetch';
 
 const $ = (id) => document.getElementById(id);
 let net = 'main';
