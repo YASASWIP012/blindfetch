@@ -1,0 +1,19 @@
+{
+	# No access log: client IP addresses are never written to disk.
+	log default {
+		output discard
+	}
+}
+
+__HOST__ {
+	encode gzip
+	handle_path /main/* {
+		reverse_proxy 127.0.0.1:8484
+	}
+	handle_path /test/* {
+		reverse_proxy 127.0.0.1:8485
+	}
+	handle {
+		respond "Blindfetch. Try /main/v1/info or /test/v1/info." 200
+	}
+}

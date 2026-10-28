@@ -7,7 +7,7 @@
 //! Query wire format, matching ZODL's `vote-nullifier-pir`:
 //! `u64 LE len(q) | q as u64 LE words | public params as u64 LE words`.
 
-use anyhow::{Context, ensure};
+use anyhow::ensure;
 use ypir::{
     client::YPIRClient,
     params::{YPIRSPConfig, params_for_scenario_simplepir_with_config},
@@ -32,6 +32,7 @@ impl Scenario {
         self.item_size_bits / 8
     }
 
+    #[cfg(feature = "server")]
     fn params(&self) -> spiral_rs::params::Params {
         params_for_scenario_simplepir_with_config(
             self.num_items as u64,
@@ -166,8 +167,7 @@ mod server {
             let resp = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 self.server.perform_online_computation_simplepir(&q, &self.offline, &[&pp], None)
             }))
-            .map_err(|_| anyhow::anyhow!("query rejected"))
-            .context("YPIR online computation")?;
+            .map_err(|_| anyhow::anyhow!("query rejected by YPIR"))?;
             Ok(resp)
         }
     }
@@ -195,6 +195,22 @@ mod tests {
             let p = client.query(i).unwrap();
             let resp = server.answer(&p.payload).unwrap();
             assert_eq!(client.decode(p, &resp).unwrap(), want, "row {i}");
+        }
+    }
+}
+
+#[cfg(test)]
+mod sizes {
+    use super::*;
+
+    /// `cargo test -p bf-pir --release -- --ignored --nocapture sizes`
+    #[test]
+    #[ignore]
+    fn query_sizes() {
+        for (rows, row_bytes) in [(4096usize, 4096usize), (262_144, 4096), (65_536, 16_384), (32_768, 32_768), (16_384, 65_536), (8_192, 131_072)] {
+            let c = Client::new(Scenario::new(rows, row_bytes));
+            let p = c.query(rows - 1).unwrap();
+            println!("{rows} rows x {} KiB ({} MiB db): query {} KiB", row_bytes >> 10, (rows * row_bytes) >> 20, p.payload.len() >> 10);
         }
     }
 }

@@ -231,8 +231,8 @@ mod tests {
 
     fn sample() -> (Index, Vec<u8>, Vec<Vec<u8>>) {
         let txs: Vec<(TxKey, Vec<u8>)> = vec![
-            (key(100, 1), vec![1; 1900]),
-            (key(100, 4), vec![2; 5000]),
+            (key(100, 1), vec![1; ROW_BYTES / 2 + 100]),
+            (key(100, 4), vec![2; ROW_BYTES]),
             (key(103, 0), vec![3; 10]),
             (key(250, 2), vec![4; ROW_BYTES * 2]),
         ];
@@ -266,7 +266,7 @@ mod tests {
                 .collect();
             assert_eq!(&entry.extract(&rows).unwrap(), tx);
         }
-        // The 5,000-byte transaction starts mid-row and spans two rows.
+        // The row-sized transaction starts mid-row and spans two rows.
         assert_eq!(index.get(key(100, 4)).unwrap().rows(), 0..2);
         assert_eq!(index.get(key(101, 0)), None);
     }

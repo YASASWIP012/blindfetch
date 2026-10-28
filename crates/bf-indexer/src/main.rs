@@ -26,6 +26,10 @@ struct Cli {
     /// Directory holding one subdirectory per network.
     #[arg(long, default_value = "data")]
     data: PathBuf,
+    /// Start here instead of at Ironwood activation. For sampling only: a
+    /// database that starts late does not cover older transactions.
+    #[arg(long)]
+    from: Option<u32>,
     #[command(subcommand)]
     cmd: Cmd,
 }
@@ -56,9 +60,25 @@ enum Cmd {
         /// Keep following the tip after catching up.
         #[arg(long)]
         follow: bool,
+        /// While following, rebuild index.bin and rows.bin once this many new
+        /// blocks have been indexed. 0 disables rebuilding.
+        #[arg(long, default_value_t = 20)]
+        rebuild_every: u32,
     },
     /// Pack the log into index.bin and rows.bin.
     Build,
+    /// Fetch random logged transactions from a Blindfetch server, check each
+    /// against its txid, and report what it cost.
+    Bench {
+        #[arg(long, default_value = "http://127.0.0.1:8484")]
+        url: String,
+        /// How many transactions to fetch, in one go.
+        #[arg(long, default_value_t = 8)]
+        count: usize,
+        /// Repeat the fetch this many times.
+        #[arg(long, default_value_t = 3)]
+        runs: usize,
+    },
 }
 
 impl Net {
@@ -106,30 +126,36 @@ async fn main() -> anyhow::Result<()> {
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
         )
         .init();
+    // Both rustls backends end up in the dependency graph; pick one.
+    let _ = rustls::crypto::ring::default_provider().install_default();
     let cli = Cli::parse();
     let dir = cli.data.join(cli.network.dir_name());
+    let first = cli.from.unwrap_or_else(|| cli.network.first_height());
     match cli.cmd {
-        Cmd::Sync { server, confirmations, to, chunk, concurrency, follow } => {
+        Cmd::Sync { server, confirmations, to, chunk, concurrency, follow, rebuild_every } => {
             let server = server.unwrap_or_else(|| cli.network.default_server().to_string());
-            sync(cli.network, &dir, &server, confirmations, to, chunk, concurrency, follow).await
+            let opts = SyncOpts { confirmations, to, chunk, concurrency, follow, rebuild_every };
+            sync(cli.network, first, &dir, &server, opts).await
         }
-        Cmd::Build => build(cli.network, &dir),
+        Cmd::Build => build(cli.network, first, &dir),
+        Cmd::Bench { url, count, runs } => bench(cli.network, first, &dir, &url, count, runs).await,
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-async fn sync(
-    net: Net,
-    dir: &std::path::Path,
-    server: &str,
+struct SyncOpts {
     confirmations: u32,
     to: Option<u32>,
     chunk: u32,
     concurrency: usize,
     follow: bool,
-) -> anyhow::Result<()> {
+    rebuild_every: u32,
+}
+
+async fn sync(net: Net, first_height: u32, dir: &std::path::Path, server: &str, opts: SyncOpts) -> anyhow::Result<()> {
+    let SyncOpts { confirmations, to, chunk, concurrency, follow, rebuild_every } = opts;
     let params = net.params();
-    let mut store = Store::open(dir, net.first_height())?;
+    let mut built_at: Option<u32> = None;
+    let mut store = Store::open(dir, first_height)?;
     let mut client = lwd::connect(server).await?;
     info!(server, from = store.next_height(), "syncing");
 
@@ -202,6 +228,12 @@ async fn sync(
         if !follow {
             return Ok(());
         }
+        let indexed = store.next_height().saturating_sub(1);
+        if rebuild_every > 0 && built_at.is_none_or(|b| indexed >= b + rebuild_every) {
+            let dir = dir.to_path_buf();
+            tokio::task::spawn_blocking(move || build(net, first_height, &dir)).await??;
+            built_at = Some(indexed);
+        }
         tokio::time::sleep(std::time::Duration::from_secs(30)).await;
     }
 }
@@ -221,9 +253,9 @@ struct Stats {
     largest_tx_bytes: u32,
 }
 
-fn build(net: Net, dir: &std::path::Path) -> anyhow::Result<()> {
-    let store = Store::open(dir, net.first_height())?;
-    let mut packer = Packer::new(net.core(), net.first_height());
+fn build(net: Net, first_height: u32, dir: &std::path::Path) -> anyhow::Result<()> {
+    let store = Store::open(dir, first_height)?;
+    let mut packer = Packer::new(net.core(), first_height);
     let (mut n, mut mined, mut largest) = (0usize, 0u64, 0u32);
     for rec in store.records()? {
         let rec = rec?;
@@ -261,5 +293,57 @@ fn write_atomic(path: &std::path::Path, bytes: &[u8]) -> anyhow::Result<()> {
     let tmp = path.with_extension("tmp");
     std::fs::write(&tmp, bytes)?;
     std::fs::rename(&tmp, path)?;
+    Ok(())
+}
+
+async fn bench(net: Net, first_height: u32, dir: &std::path::Path, url: &str, count: usize, runs: usize) -> anyhow::Result<()> {
+    let store = Store::open(dir, first_height)?;
+    let bf = bf_client::Blindfetch::connect(url).await?;
+    let last = bf.info().last_height;
+    let all: Vec<(TxKey, [u8; 32])> = store
+        .records()?
+        .filter_map(|r| r.ok())
+        .filter(|r| r.key.height <= last)
+        .map(|r| (r.key, r.txid))
+        .collect();
+    anyhow::ensure!(!all.is_empty(), "no logged transactions inside the server's database");
+    let params = net.params();
+    let mut seed = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_nanos() as u64 | 1;
+    let mut next = || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed
+    };
+    for run in 0..runs {
+        let wants: Vec<bf_client::Want> = (0..count)
+            .map(|_| {
+                let (key, txid) = all[(next() % all.len() as u64) as usize];
+                bf_client::Want { key, txid: zcash_primitives::transaction::TxId::from_bytes(txid) }
+            })
+            .collect();
+        let started = Instant::now();
+        let (results, rounds) = bf.fetch(&params, &wants).await?;
+        let found = results.iter().filter(|(_, f)| matches!(f, bf_client::Fetched::Found(_))).count();
+        let up: usize = rounds.iter().map(|r| r.bytes_up).sum();
+        let down: usize = rounds.iter().map(|r| r.bytes_down).sum();
+        let queries: usize = rounds.iter().map(|r| r.queries).sum();
+        let real: usize = rounds.iter().map(|r| r.real).sum();
+        println!(
+            "run {run}: {found}/{count} verified against their txids | {} round(s), {queries} queries ({real} real) | up {:.2} MiB, down {:.2} MiB | {} ms",
+            rounds.len(),
+            up as f64 / 1048576.0,
+            down as f64 / 1048576.0,
+            started.elapsed().as_millis()
+        );
+    }
+    let cover = bf.cover_round().await?;
+    println!(
+        "cover round: {} queries, up {:.2} MiB, down {:.2} MiB, {} ms",
+        cover.queries,
+        cover.bytes_up as f64 / 1048576.0,
+        cover.bytes_down as f64 / 1048576.0,
+        cover.millis
+    );
     Ok(())
 }

@@ -10,23 +10,36 @@
 //! transaction or serves stale data is caught, because the txid will not
 //! match.
 //!
-//! The stripped bytes are an ordinary transaction encoding with zero-length
-//! proofs, so any code that parses transactions can read them. They must
-//! never be broadcast: without proofs they are not valid on chain.
+//! The transaction parser insists that proofs have their canonical length,
+//! so stripping replaces each proof with zeros of the same length and then
+//! collapses long zero runs (`bf_core::zeros`). Decoding restores an
+//! ordinary transaction encoding that any parser reads. It must never be
+//! broadcast: with zeroed proofs it is not valid on chain.
 
 use orchard::{bundle::Authorized as BundleAuthorized, circuit::Proof};
 use zcash_primitives::transaction::{Authorized, Transaction, TxId, TxVersion};
 use zcash_protocol::consensus::BranchId;
 
+/// Undoes the zero-run compression.
+pub fn expand(bytes: &[u8]) -> Result<Vec<u8>, Error> {
+    bf_core::zeros::decode(bytes, MAX_TX_BYTES).ok_or(Error::BadEncoding)
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error("stripped transaction is not validly encoded")]
+    BadEncoding,
     #[error("could not parse transaction: {0}")]
     Parse(#[from] std::io::Error),
     #[error("txid mismatch: expected {expected}, got {actual}")]
     TxidMismatch { expected: TxId, actual: TxId },
 }
 
-/// A transaction with its Orchard and Ironwood proofs removed.
+/// Largest transaction a client will expand a row into. Zcash blocks are at
+/// most 2 MB.
+pub const MAX_TX_BYTES: usize = 2_000_000;
+
+/// A transaction with its Orchard and Ironwood proofs zeroed and compressed.
 #[derive(Clone, Debug)]
 pub struct Stripped {
     pub txid: TxId,
@@ -44,7 +57,7 @@ pub fn strip(raw: &[u8], branch: BranchId) -> Result<Stripped, Error> {
     let tx = Transaction::read(raw, branch)?;
     let txid = tx.txid();
     if matches!(tx.version(), TxVersion::V4) {
-        return Ok(Stripped { txid, bytes: raw.to_vec(), original_len: raw.len() });
+        return Ok(Stripped { txid, bytes: bf_core::zeros::encode(raw), original_len: raw.len() });
     }
 
     let without_proofs = |bundle: Option<orchard::Bundle<BundleAuthorized, _>>| {
@@ -53,7 +66,8 @@ pub fn strip(raw: &[u8], branch: BranchId) -> Result<Stripped, Error> {
                 &mut (),
                 |_, _, sig| sig,
                 |_, auth: BundleAuthorized| {
-                    BundleAuthorized::from_parts(Proof::new(vec![]), *auth.binding_signature())
+                    let len = auth.proof().as_ref().len();
+                    BundleAuthorized::from_parts(Proof::new(vec![0; len]), auth.binding_signature().clone())
                 },
             )
         })
@@ -69,16 +83,16 @@ pub fn strip(raw: &[u8], branch: BranchId) -> Result<Stripped, Error> {
     if actual != txid {
         return Err(Error::TxidMismatch { expected: txid, actual });
     }
-    let mut bytes = Vec::with_capacity(raw.len() / 2);
-    stripped.write(&mut bytes)?;
-    Ok(Stripped { txid, bytes, original_len: raw.len() })
+    let mut zeroed = Vec::with_capacity(raw.len());
+    stripped.write(&mut zeroed)?;
+    Ok(Stripped { txid, bytes: bf_core::zeros::encode(&zeroed), original_len: raw.len() })
 }
 
 /// Parses stripped bytes and checks them against the txid the wallet asked
 /// for. This is the only check a wallet needs: the txid commits to every
 /// note, memo and value in the transaction.
 pub fn verify(bytes: &[u8], expected: TxId, branch: BranchId) -> Result<Transaction, Error> {
-    let tx = Transaction::read(bytes, branch)?;
+    let tx = Transaction::read(&expand(bytes)?[..], branch)?;
     let actual = tx.txid();
     if actual != expected {
         return Err(Error::TxidMismatch { expected, actual });

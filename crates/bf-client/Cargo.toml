@@ -1,0 +1,19 @@
+[package]
+name = "bf-client"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Fetch your own transactions from a Blindfetch server without telling it which ones"
+
+[dependencies]
+anyhow.workspace = true
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+bf-core = { path = "../bf-core" }
+bf-pir = { path = "../bf-pir" }
+bf-tx = { path = "../bf-tx" }
+getrandom = "0.3"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-webpki-roots", "json"] }
+serde_json.workspace = true
+tracing = "0.1"
+zcash_primitives = "=0.31.0-pre.2"
+zcash_protocol = { version = "=0.11.0-pre.1", features = ["local-consensus"] }

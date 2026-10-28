@@ -7,7 +7,7 @@ description = "Thin wrapper over the audited valar-ypir crate: SimplePIR rows in
 
 [features]
 default = []
-server = ["ypir/server"]
+server = ["ypir/server", "ypir/rayon"]
 
 [dependencies]
 anyhow.workspace = true

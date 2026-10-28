@@ -163,8 +163,15 @@ async fn query(State(app): State<Arc<AppState>>, headers: HeaderMap, body: Bytes
     }
     let owned: Vec<Vec<u8>> = parts.iter().map(|p| p.to_vec()).collect();
     let db2 = db.clone();
+    // Queries in a round are independent; answer them on separate cores.
     let answers = tokio::task::spawn_blocking(move || {
-        owned.iter().map(|q| db2.pir.answer(q)).collect::<anyhow::Result<Vec<_>>>()
+        std::thread::scope(|s| {
+            let handles: Vec<_> = owned.iter().map(|q| s.spawn(|| db2.pir.answer(q))).collect();
+            handles
+                .into_iter()
+                .map(|h| h.join().map_err(|_| anyhow::anyhow!("query thread panicked"))?)
+                .collect::<anyhow::Result<Vec<_>>>()
+        })
     })
     .await;
     let answers = match answers {

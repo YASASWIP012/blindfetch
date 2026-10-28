@@ -11,6 +11,8 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow.workspace = true
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+bf-client = { path = "../bf-client" }
 bf-core = { path = "../bf-core" }
 bf-tx = { path = "../bf-tx" }
 clap = { version = "4.5", features = ["derive"] }
@@ -23,4 +25,5 @@ tonic = { version = "0.14", features = ["gzip", "tls-webpki-roots"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 zcash_client_backend = { version = "=0.25.0-pre.2", features = ["lightwalletd-tonic-tls-webpki-roots"] }
+zcash_primitives = "=0.31.0-pre.2"
 zcash_protocol = { version = "=0.11.0-pre.1", features = ["local-consensus"] }

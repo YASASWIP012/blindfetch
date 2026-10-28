@@ -13,14 +13,16 @@ mod index;
 mod plan;
 mod varint;
 pub mod wire;
+pub mod zeros;
 
 pub use index::{Entry, Index, IndexError, Packer, TxKey};
 pub use plan::{Batch, QueryPlan};
 
-/// Bytes per PIR row. YPIR's SimplePIR mode needs at least 28,672 bits
-/// (3,584 bytes) per item; 4 KiB holds a stripped two-action Ironwood
-/// transaction with room to spare.
-pub const ROW_BYTES: usize = 4096;
+/// Bytes per PIR row. YPIR's query size falls as rows get wider and its
+/// response size rises; at a 1 GiB database, 32 KiB rows give the smallest
+/// round trip (784 KiB up per query, about 200 KiB down). A row holds around
+/// fifteen stripped transactions.
+pub const ROW_BYTES: usize = 32 * 1024;
 
 /// YPIR's SimplePIR mode needs at least this many rows. Smaller databases are
 /// padded with zero rows.
@@ -28,7 +30,7 @@ pub const MIN_ROWS: usize = 2048;
 
 /// Every round a client sends exactly this many row queries, real or not, so
 /// the server cannot count how many transactions a wallet is fetching.
-pub const DEFAULT_BATCH: usize = 8;
+pub const DEFAULT_BATCH: usize = 4;
 
 /// Which chain an index or database describes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

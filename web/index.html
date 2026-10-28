@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Blindfetch</title>
+  <meta name="description" content="Zcash light wallets read their memos over PIR, so the server never learns which transactions are theirs.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="wrap">
+    <p class="kicker">Zcash · Ironwood · private information retrieval</p>
+    <h1>Blindfetch</h1>
+    <p class="lede">
+      To read a memo, a Zcash light wallet asks its server for the transaction by txid.
+      That one request tells the server which payment is yours.
+      Blindfetch answers the same request over PIR: the wallet gets the transaction,
+      and the server cannot tell which one it sent.
+    </p>
+  </header>
+
+  <main class="wrap">
+    <section class="card" id="status-card">
+      <div class="row between">
+        <h2>The database</h2>
+        <div class="seg" role="tablist">
+          <button data-net="main" class="on">Mainnet</button>
+          <button data-net="test">Testnet</button>
+        </div>
+      </div>
+      <p id="status" class="muted">Connecting…</p>
+      <dl class="stats" id="stats"></dl>
+    </section>
+
+    <section class="card">
+      <h2>Fetch a transaction privately</h2>
+      <p class="muted">Pick any shielded transaction mined since Ironwood activation. Your browser builds the queries; the server answers without learning which one you picked.</p>
+      <div class="pick">
+        <label>Height <input id="h" inputmode="numeric" autocomplete="off"></label>
+        <label>Position in block <input id="i" inputmode="numeric" autocomplete="off"></label>
+        <label class="grow">Expected txid (optional) <input id="txid" autocomplete="off" spellcheck="false" placeholder="paste from a block explorer to check it"></label>
+        <button id="go" class="cta" disabled>Fetch privately</button>
+      </div>
+      <div id="recent" class="recent"></div>
+      <div id="result" class="result" hidden></div>
+    </section>
+
+    <section class="card">
+      <h2>What each server learns</h2>
+      <div class="split">
+        <div>
+          <h3>A stock lightwalletd</h3>
+          <p class="muted">The request a wallet sends today to read this memo.</p>
+          <pre id="stock" class="log">Fetch a transaction to see it.</pre>
+        </div>
+        <div>
+          <h3>This Blindfetch server</h3>
+          <p class="muted">Its full request log, live from <code>/v1/seen</code>. This is everything it knows.</p>
+          <pre id="seen" class="log">Loading…</pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="card prose">
+      <h2>How it works</h2>
+      <ol>
+        <li>The server keeps every transaction with a shielded output since Ironwood activation, with its proofs removed. Proofs are not covered by the txid (ZIP 244, ZIP 229), so what remains still matches the txid exactly.</li>
+        <li>It cuts them into 4 KiB rows and serves the rows over YPIR, the PIR scheme ZODL uses for shielded voting, from the Zellic-audited <code>valar-ypir</code> crate.</li>
+        <li>Your wallet already knows where its transactions were mined from scanning compact blocks. It downloads the whole index, finds the rows, and asks for them in rounds of exactly eight queries, filling empty slots with random rows.</li>
+        <li>It recomputes the txid of what came back. A server that alters a memo or serves the wrong transaction fails that check.</li>
+      </ol>
+      <p><a id="repo" href="#">Source, spec and threat model</a></p>
+    </section>
+  </main>
+
+  <footer class="wrap muted">Built for ZECATHON 2026, Core &amp; Tooling.</footer>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

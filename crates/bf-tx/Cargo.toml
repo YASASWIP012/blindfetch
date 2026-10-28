@@ -6,6 +6,7 @@ license.workspace = true
 description = "Strip authorizing data from Zcash transactions and check them against their txid"
 
 [dependencies]
+bf-core = { path = "../bf-core" }
 orchard = { version = "0.16", default-features = false }
 zcash_primitives = "=0.31.0-pre.2"
 zcash_protocol = { version = "=0.11.0-pre.1", features = ["local-consensus"] }

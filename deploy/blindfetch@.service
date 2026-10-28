@@ -1,0 +1,14 @@
+[Unit]
+Description=Blindfetch %i
+After=network-online.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/blindfetch
+EnvironmentFile=/home/ubuntu/blindfetch/deploy/%i.env
+ExecStart=/home/ubuntu/blindfetch/target/release/${BIN} ${ARGS}
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

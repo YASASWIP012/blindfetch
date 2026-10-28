@@ -1,0 +1,179 @@
+//! Fetch your own transactions without telling the server which ones.
+//!
+//! A wallet that has scanned compact blocks knows where its transactions are
+//! (height and position in the block) but not their full contents, which it
+//! needs for memos. Instead of asking lightwalletd for each txid, it asks a
+//! Blindfetch server for the rows that hold them, over PIR, in rounds of a
+//! fixed size. Then it checks each result against the txid it expected.
+//!
+//! What the server sees: one download of the whole index, then requests of
+//! exactly `batch` encrypted queries each. Not which rows, not how many of
+//! them were real, not which transactions.
+
+use std::time::Instant;
+
+use anyhow::{Context, anyhow, ensure};
+use bf_core::{Entry, Index, QueryPlan, TxKey, wire};
+use bf_pir::{Client as Pir, Scenario};
+use tracing::debug;
+use zcash_primitives::transaction::{Transaction, TxId};
+use zcash_protocol::consensus::{BlockHeight, BranchId, Parameters};
+
+pub use bf_core::wire::Info;
+
+/// What one round trip cost, for the measurements the demo reports.
+#[derive(Clone, Debug, Default)]
+pub struct RoundStats {
+    pub queries: usize,
+    pub real: usize,
+    pub bytes_up: usize,
+    pub bytes_down: usize,
+    pub millis: u128,
+}
+
+pub struct Blindfetch {
+    base: String,
+    http: reqwest::Client,
+    info: Info,
+    index: Index,
+    pir: Pir,
+}
+
+/// A transaction the wallet wants, located by where it was mined.
+#[derive(Clone, Copy, Debug)]
+pub struct Want {
+    pub key: TxKey,
+    pub txid: TxId,
+}
+
+pub enum Fetched {
+    /// Checked against its txid.
+    Found(Box<Transaction>),
+    /// Not in the database: mined before Ironwood activation, after the
+    /// database's last height, or carrying no shielded output.
+    NotCovered,
+}
+
+fn random_u64() -> u64 {
+    let mut b = [0u8; 8];
+    getrandom::fill(&mut b).expect("system randomness");
+    u64::from_le_bytes(b)
+}
+
+impl Blindfetch {
+    /// Downloads the server's info and its whole index.
+    pub async fn connect(base: &str) -> anyhow::Result<Self> {
+        // Both rustls backends end up in a wallet's dependency graph; pick one
+        // if the host has not.
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        let base = base.trim_end_matches('/').to_string();
+        let http = reqwest::Client::builder().build()?;
+        let info: Info = http
+            .get(format!("{base}/v1/info"))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+            .context("read /v1/info")?;
+        let index_bytes = http.get(format!("{base}/v1/index")).send().await?.error_for_status()?.bytes().await?;
+        let index = Index::decode(&index_bytes)?;
+        ensure!(
+            index.last_height == info.last_height && index.num_rows() == info.num_rows,
+            "server's index does not match its info; try again"
+        );
+        ensure!(info.row_bytes == bf_core::ROW_BYTES, "unsupported row size {}", info.row_bytes);
+        let mut scenario = Scenario::new(info.num_rows, info.row_bytes);
+        scenario.poly_len = info.poly_len;
+        Ok(Blindfetch { base, http, info, index, pir: Pir::new(scenario) })
+    }
+
+    pub fn info(&self) -> &Info {
+        &self.info
+    }
+
+    pub fn index(&self) -> &Index {
+        &self.index
+    }
+
+    pub fn locate(&self, key: TxKey) -> Option<Entry> {
+        self.index.get(key)
+    }
+
+    /// Sends one round of exactly `batch` queries and returns the rows asked
+    /// for, in the order of `rows`.
+    async fn round(&self, rows: &[usize], real: usize) -> anyhow::Result<(Vec<Vec<u8>>, RoundStats)> {
+        let started = Instant::now();
+        let pending: Vec<_> = rows.iter().map(|&r| self.pir.query(r)).collect::<anyhow::Result<_>>()?;
+        let body = wire::encode_parts(&pending.iter().map(|p| p.payload.as_slice()).collect::<Vec<_>>());
+        let bytes_up = body.len();
+        let resp = self
+            .http
+            .post(format!("{}/v1/query", self.base))
+            .header("x-db-version", self.info.last_height.to_string())
+            .body(body)
+            .send()
+            .await?;
+        ensure!(resp.status() != reqwest::StatusCode::CONFLICT, "the server rebuilt its database; reconnect");
+        let resp = resp.error_for_status()?.bytes().await?;
+        let parts = wire::decode_parts(&resp).ok_or_else(|| anyhow!("malformed response"))?;
+        ensure!(parts.len() == pending.len(), "server answered {} of {} queries", parts.len(), pending.len());
+        let mut out = Vec::with_capacity(real);
+        for (p, answer) in pending.into_iter().zip(parts).take(real) {
+            out.push(self.pir.decode(p, answer)?);
+        }
+        let stats = RoundStats {
+            queries: rows.len(),
+            real,
+            bytes_up,
+            bytes_down: resp.len(),
+            millis: started.elapsed().as_millis(),
+        };
+        debug!(?stats, "round");
+        Ok((out, stats))
+    }
+
+    /// One round of dummy queries. A wallet can send these on a timer so that
+    /// rounds with real queries do not stand out.
+    pub async fn cover_round(&self) -> anyhow::Result<RoundStats> {
+        let plan = QueryPlan::new([], self.info.num_rows, self.info.batch, 1, random_u64);
+        let (_, stats) = self.round(&plan.batches[0].rows, 0).await?;
+        Ok(stats)
+    }
+
+    /// Fetches and verifies the wanted transactions.
+    pub async fn fetch<P: Parameters>(
+        &self,
+        params: &P,
+        wants: &[Want],
+    ) -> anyhow::Result<(Vec<(Want, Fetched)>, Vec<RoundStats>)> {
+        let located: Vec<(Want, Option<Entry>)> = wants.iter().map(|w| (*w, self.locate(w.key))).collect();
+        let needed = located.iter().filter_map(|(_, e)| *e).flat_map(|e| e.rows());
+        let plan = QueryPlan::new(needed, self.info.num_rows, self.info.batch, 1, random_u64);
+
+        let mut rows = std::collections::HashMap::new();
+        let mut stats = Vec::new();
+        for batch in &plan.batches {
+            let (got, s) = self.round(&batch.rows, batch.real).await?;
+            for (r, bytes) in batch.rows.iter().zip(got) {
+                rows.insert(*r, bytes);
+            }
+            stats.push(s);
+        }
+
+        let mut out = Vec::with_capacity(located.len());
+        for (want, entry) in located {
+            let Some(entry) = entry else {
+                out.push((want, Fetched::NotCovered));
+                continue;
+            };
+            let parts: Vec<Vec<u8>> = entry.rows().map(|r| rows[&r].clone()).collect();
+            let bytes = entry.extract(&parts).ok_or_else(|| anyhow!("rows did not hold the transaction"))?;
+            let branch = BranchId::for_height(params, BlockHeight::from_u32(want.key.height));
+            let tx = bf_tx::verify(&bytes, want.txid, branch)
+                .with_context(|| format!("transaction at {:?} failed its txid check", want.key))?;
+            out.push((want, Fetched::Found(Box::new(tx))));
+        }
+        Ok((out, stats))
+    }
+}

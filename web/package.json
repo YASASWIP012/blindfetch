@@ -1,0 +1,8 @@
+{
+  "name": "blindfetch-web",
+  "private": true,
+  "scripts": {
+    "wasm": "wasm-pack build ../crates/bf-wasm --target web --release --out-dir ../../web/pkg --no-typescript",
+    "build": "npm run wasm && node build.mjs"
+  }
+}
