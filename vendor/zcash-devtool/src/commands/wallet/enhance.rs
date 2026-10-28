@@ -128,7 +128,7 @@ impl Command {
         let strict = self.blindfetch.is_some() && !self.allow_fallback;
         if let Some(url) = &self.blindfetch {
             let mut bf = bf_client::Blindfetch::connect(url).await?;
-            let info = bf.info();
+            let info = bf.info().clone();
             println!(
                 "Blindfetch: {} transactions, heights {}..={}, {} rows, {} queries per round",
                 info.transactions, info.first_height, info.last_height, info.num_rows, info.batch
