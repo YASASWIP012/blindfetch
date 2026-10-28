@@ -39,18 +39,11 @@ pub(crate) struct Command {
     #[arg(long, requires = "blindfetch")]
     allow_fallback: bool,
 
-    /// With --blindfetch, how often to fetch, in seconds. The wallet keeps
-    /// running and fetches on this schedule whether or not anything arrived,
-    /// so the server cannot tell when payments land.
-    #[arg(long, default_value_t = 300, requires = "blindfetch")]
-    every: u64,
-
-    /// With --blindfetch, fetch exactly one tick and exit. Run it after every
-    /// sync whether or not anything arrived (the mobile profile): the server
-    /// then learns only that a sync happened, which lightwalletd already sees.
-    /// Running it only when something arrived reveals that.
+    /// With --blindfetch, keep running and fetch every this many seconds,
+    /// whether or not anything arrived. Without it, enhance fetches exactly
+    /// one fixed round and exits; run it after every sync, unconditionally.
     #[arg(long, requires = "blindfetch")]
-    once: bool,
+    every: Option<u64>,
 
     /// With --blindfetch, check the server's index against a second
     /// Blindfetch server before sending any query.
@@ -194,9 +187,10 @@ impl Command {
             );
 
             // Ticks fall on fixed deadlines, however long a tick's work takes.
-            let scheduled = !self.once;
-            let mut ticks = scheduled
-                .then(|| tokio::time::interval(std::time::Duration::from_secs(self.every.max(1))));
+            let scheduled = self.every.is_some();
+            let mut ticks = self
+                .every
+                .map(|secs| tokio::time::interval(std::time::Duration::from_secs(secs.max(1))));
             // Set once the server fails a check. From then on every tick is
             // dummies only, so the server cannot see that anything changed.
             let mut caught = false;

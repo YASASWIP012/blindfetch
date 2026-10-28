@@ -57,7 +57,7 @@ this wallet's payments.</span></pre>
                 <div class="window__bar"><div class="lights"><i></i><i></i><i></i></div><span class="window__title">with --blindfetch</span></div>
                 <pre class="term"><span class="dim">$ zcash-devtool wallet enhance --blindfetch</span>
 Fetched 3 of 3 transactions in 1 round
-of 4 queries: 2.1 MiB up, 0.5 MiB down
+of 4 queries: 4.1 MiB up, 0.5 MiB down
 <span class="good">lightwalletd was not asked for any of them.</span>
 
 <span class="dim">Same memos, byte for byte.</span></pre>
@@ -120,9 +120,9 @@ txids        all unchanged</pre></div>
           <div class="split split--flip reveal">
             <div>
               <span class="eyebrow">Fetch</span>
-              <h3>Four queries, every five minutes.</h3>
-              <p class="lead">YPIR, from the Zellic-audited <code class="t-mono">valar-ypir</code> crate that ZODL uses for shielded voting, hides which row each query asks for. The wallet sends the same round on a timer whether or not anything arrived.</p>
-              <div class="chips"><span class="chip">32 KiB rows</span><span class="chip">Dummies shuffled in</span><span class="chip">Fixed schedule by default</span></div>
+              <h3>Four queries, after every sync.</h3>
+              <p class="lead">YPIR, from the Zellic-audited <code class="t-mono">valar-ypir</code> crate that ZODL uses for shielded voting, hides which row each query asks for. The wallet sends the same round after every sync, whether or not anything arrived.</p>
+              <div class="chips"><span class="chip">32 KiB rows</span><span class="chip">Dummies shuffled in</span><span class="chip">One round per sync</span></div>
             </div>
             <div class="stage stage--soft">
               <div class="window"><div class="window__bar"><div class="lights"><i></i><i></i><i></i></div><span class="window__title">server log, two ticks</span></div>
@@ -216,7 +216,7 @@ or the chain; stop using it</pre></div>
         <div class="faq">
           <details><summary>Does the server have to be trusted?</summary><p>Not with which transactions you read. PIR keeps that from it, and every answer is checked against the index and the txid. It can refuse service, and it sees your address and when you connect, like any server.</p></details>
           <details><summary>Why not hide the request among decoy txids?</summary><p>A server that sees your real txid among seven decoys learns that one of eight is yours, and repeated fetches narrow it down. Here every request covers the whole database.</p></details>
-          <details><summary>Why not download every transaction?</summary><p>That is about 8 MB per day of chain, so a wallet offline for a week would download about 55 MB. A Blindfetch round is about 2 to 3 MB up and 0.5 MB down.</p></details>
+          <details><summary>Why not download every transaction?</summary><p>That is about 8 MB per day of chain, so a wallet offline for a week would download about 55 MB. A Blindfetch round is about 4 MB up and 0.5 MB down, once per sync.</p></details>
           <details><summary>What about memos from before Ironwood?</summary><p>They are not in the database. In Blindfetch mode zcash-devtool leaves them pending and never sends their txids to lightwalletd.</p></details>
           <details><summary>Which wallets can use it?</summary><p>zcash-devtool today. Any wallet built on librustzcash answers the same enhancement request, and the integration guide shows the change.</p></details>
           <details><summary>Who runs the server?</summary><p>For this demo, the author, on a laptop. Anyone can run one with a lightwalletd endpoint, and wallets can compare two servers' indexes before trusting either.</p></details>

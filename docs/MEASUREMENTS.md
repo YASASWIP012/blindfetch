@@ -76,7 +76,8 @@ read, against a server covering blocks 3,529,900 to 3,530,800:
 | | Requests naming the wallet's transactions | Rounds | Up | Down | Time |
 |---|---|---|---|---|---|
 | Stock zcash-devtool | 3 `GetTransaction` to lightwalletd | | | | |
-| `enhance --blindfetch` | 0 | 2 of 4 queries | 4.3 MiB | 0.9 MiB | 1.5 s |
+| `enhance --blindfetch`, small range server | 0 | 2 of 4 queries | 4.3 MiB | 0.9 MiB | 1.5 s |
+| `enhance --blindfetch`, full mainnet server, one round | 0 | 1 of 4 queries | 4.1 MiB | 0.5 MiB | 8.3 s |
 
 Both wallets ended with identical transaction and memo listings.
 
@@ -90,12 +91,13 @@ the same record in the server's log: two requests of 2,228,276 bytes in and
 At the full database size a fetch of one round is 4.06 MiB up and 0.47 MiB
 down, measured. The index is 2.4 MB, downloaded once per database version.
 
-- **Desktop profile** (zcash-devtool default): one round every five minutes,
-  about 1.1 GiB up a day while running. Suited to an always-on desktop or
-  server wallet.
-- **Mobile profile**: one round after every sync, whether or not anything
-  arrived (`enhance --once` after `sync`). The server learns only that a sync
-  happened, which lightwalletd already sees. Ten syncs a day is about 41 MiB up.
+- **Per sync** (zcash-devtool default, and the profile for mobile): one round
+  after every sync, whether or not anything arrived. The server learns only
+  that a sync happened, which lightwalletd already sees. Ten syncs a day is
+  about 41 MiB up.
+- **Timer** (`--every 300`): one round every five minutes while running, about
+  1.1 GiB up a day. Only for always-on wallets that want new memos within
+  minutes.
 
 ## What this costs a server
 

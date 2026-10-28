@@ -115,6 +115,21 @@ mod tests {
         assert!(firsts.len() > 1, "the real query always sat in the same slot");
     }
 
+    /// Conformance: a tick of `rounds` rounds has the same shape whether the
+    /// wallet wants nothing, one row or as many rows as fit. Integrators must
+    /// call it unconditionally (every sync, or every timer tick).
+    #[test]
+    fn tick_shape_is_independent_of_wants() {
+        let mut rng = counter();
+        let shape = |p: &QueryPlan| p.batches.iter().map(|b| b.rows.len()).collect::<Vec<_>>();
+        let none = QueryPlan::new([], 65_536, 4, 1, &mut rng);
+        let one = QueryPlan::new([9_000], 65_536, 4, 1, &mut rng);
+        let full = QueryPlan::new([1, 2, 3, 4], 65_536, 4, 1, &mut rng);
+        assert_eq!(shape(&none), [4]);
+        assert_eq!(shape(&none), shape(&one));
+        assert_eq!(shape(&one), shape(&full));
+    }
+
     #[test]
     fn spills_into_more_rounds() {
         let plan = QueryPlan::new(0..19, 2048, 8, 1, counter());

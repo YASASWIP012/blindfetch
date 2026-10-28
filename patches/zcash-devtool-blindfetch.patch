@@ -12,7 +12,7 @@ index 3aa6c5e..69bc22e 100644
  bip32 = { version = "0.6", default-features = false, features = ["secp256k1-ffi"] }
  futures-util = "0.3"
 diff --git a/src/commands/wallet/enhance.rs b/src/commands/wallet/enhance.rs
-index 137443a..225cda7 100644
+index 137443a..8549a6c 100644
 --- a/src/commands/wallet/enhance.rs
 +++ b/src/commands/wallet/enhance.rs
 @@ -1,6 +1,7 @@
@@ -38,9 +38,9 @@ index 137443a..225cda7 100644
 +    #[arg(long, requires = "blindfetch")]
 +    allow_fallback: bool,
 +
-+    /// With --blindfetch, keep running and fetch on a fixed schedule: every
-+    /// this many seconds, exactly --rounds rounds, whether or not anything
-+    /// arrived. The server then cannot tell when payments land.
++    /// With --blindfetch, keep running and fetch every this many seconds,
++    /// whether or not anything arrived. Without it, enhance fetches exactly
++    /// one fixed round and exits; run it after every sync, unconditionally.
 +    #[arg(long, requires = "blindfetch")]
 +    every: Option<u64>,
 +
@@ -49,9 +49,9 @@ index 137443a..225cda7 100644
 +    #[arg(long, requires = "blindfetch")]
 +    compare_with: Option<String>,
 +
-+    /// Rounds per fetch (per tick with --every). Every fetch sends exactly
-+    /// this many; transactions that do not fit wait for the next one.
-+    #[arg(long, default_value_t = 2, requires = "blindfetch")]
++    /// Rounds per fetch. Every fetch sends exactly this many (four queries
++    /// each); transactions that do not fit wait for the next fetch.
++    #[arg(long, default_value_t = 1, requires = "blindfetch")]
 +    rounds: usize,
 +}
 +
@@ -109,7 +109,7 @@ index 137443a..225cda7 100644
          let chain_tip = db_data.chain_height()?.ok_or_else(|| {
              anyhow!("Chain height must be available to perform transaction enhancement.")
          })?;
-@@ -91,6 +152,146 @@ impl Command {
+@@ -91,6 +152,162 @@ impl Command {
          let mut client = self.connection.connect(params, wallet_dir.as_ref()).await?;
  
          let mut satisfied_requests = BTreeSet::new();
@@ -135,12 +135,20 @@ index 137443a..225cda7 100644
 +                "the server claims height {} but this wallet's chain tip is {chain_tip}; refusing",
 +                info.last_height
 +            );
++            // A server far behind the chain would leave new payments pending
++            // forever without saying so.
++            anyhow::ensure!(
++                BlockHeight::from_u32(info.last_height) + 300 >= chain_tip,
++                "the server's database stops at height {}, far behind this wallet's tip {chain_tip}; refusing",
++                info.last_height
++            );
 +            println!(
 +                "Blindfetch: {} transactions, heights {}..={}, {} rows, {} queries per round",
 +                info.transactions, info.first_height, info.last_height, info.num_rows, info.batch
 +            );
 +
 +            // Ticks fall on fixed deadlines, however long a tick's work takes.
++            let scheduled = self.every.is_some();
 +            let mut ticks = self
 +                .every
 +                .map(|secs| tokio::time::interval(std::time::Duration::from_secs(secs.max(1))));
@@ -182,7 +190,7 @@ index 137443a..225cda7 100644
 +                        let mut f = std::fs::OpenOptions::new().create(true).append(true).open(&lock)?;
 +                        writeln!(f, "{url}")?;
 +                        eprintln!("ALERT: {e}. Locked out in {}.", lock.display());
-+                        if self.every.is_none() {
++                        if !scheduled {
 +                            return Err(e);
 +                        }
 +                        // Keep the same schedule with dummies only, so the
@@ -217,6 +225,14 @@ index 137443a..225cda7 100644
 +                            }
 +                        }
 +                        bf_client::Fetched::NotCovered => not_covered.push(want.txid),
++                        bf_client::Fetched::Missing => {
++                            eprintln!(
++                                "Warning: the server's index does not list {}, mined at height {} inside its range. \
++                                 If this wallet received a shielded note in it, the server is withholding it.",
++                                want.txid, want.key.height
++                            );
++                            not_covered.push(want.txid);
++                        }
 +                        bf_client::Fetched::Deferred => waiting += 1,
 +                    }
 +                }
@@ -242,12 +258,12 @@ index 137443a..225cda7 100644
 +                    // In one-shot mode, keep the lightwalletd loop below from
 +                    // asking for it. On a schedule, leave it pending so a later
 +                    // tick fetches it once the server has indexed it.
-+                    if !self.allow_fallback && self.every.is_none() {
++                    if !self.allow_fallback && !scheduled {
 +                        satisfied_requests.insert(TransactionDataRequest::Enhancement(*txid));
 +                    }
 +                }
 +
-+                if self.every.is_none() {
++                if !scheduled {
 +                    break;
 +                }
 +            }
@@ -256,7 +272,7 @@ index 137443a..225cda7 100644
          loop {
              let mut new_request_encountered = false;
              for data_request in db_data.transaction_data_requests()? {
-@@ -114,6 +315,10 @@ impl Command {
+@@ -114,6 +331,10 @@ impl Command {
                          info!("Got status {:?}", status);
                          db_data.set_transaction_status(*txid, status)?;
                      }

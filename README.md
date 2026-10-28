@@ -46,9 +46,8 @@ IP, a list of your payments.
 3. **Fetch.** A wallet already knows where its transactions were mined. It
    downloads the whole index (a few bytes per transaction), finds its rows,
    and asks for them in rounds of exactly four queries, with queries for
-   random rows shuffled in. By default it fetches on a fixed schedule, every
-   five minutes, whether or not anything arrived, so the timing of fetches
-   says nothing either.
+   random rows shuffled in. It fetches one round after every sync, whether or
+   not anything arrived, so the timing of fetches says nothing either.
 4. **Verify.** The wallet checks every row, dummies too, against a hash in the
    index and recomputes each transaction's txid. A server that sends anything
    wrong is locked out, and a scheduled wallet keeps sending it dummy ticks so
@@ -68,7 +67,8 @@ cargo build --release -p bf-indexer -p bf-server -p zcash-devtool
 # Fetch random indexed transactions privately and check them against their txids
 ./target/release/bf-indexer --network main --data data --from 3532500 bench
 
-# A wallet that reads its memos through Blindfetch (fixed schedule, every 5 minutes)
+# A wallet that reads its memos through Blindfetch: one round after every sync
+./target/release/zcash-devtool wallet -w <dir> sync
 ./target/release/zcash-devtool wallet -w <dir> enhance --blindfetch http://127.0.0.1:8484
 
 # The mainnet wallet demo: stock path against Blindfetch, same memos

@@ -84,12 +84,13 @@ least two) remains for tools that do not care, such as the benchmark.
 
 **Timing.** A wallet that fetches right after a payment arrives reveals that
 something arrived, and over weeks those times can be intersected with the
-blocks that carried shielded outputs. zcash-devtool therefore runs on a fixed
-schedule by default (`--every 300`): it fetches every five minutes whether or
-not anything arrived. Mobile wallets should instead fetch exactly one round
-after every sync, unconditionally (`--once` after `sync`): the fetch then
-reveals only that a sync happened, which lightwalletd already sees. Fetching
-only when something arrived reveals arrivals, and the help text says so.
+blocks that carried shielded outputs. The rule is that a fetch never
+depends on what arrived: zcash-devtool fetches exactly one round per `enhance`
+call, to be run after every `sync` whether or not it found anything, so the
+fetch reveals only that a sync happened, which lightwalletd already sees.
+`--every N` instead fetches on a timer while it runs. Fetching only when
+something arrived reveals arrivals; the spec says MUST NOT and the help text
+says so.
 
 **Withheld transactions.** A server could leave a transaction out of its
 index. The wallet knows from compact blocks where each of its transactions was

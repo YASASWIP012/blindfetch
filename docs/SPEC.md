@@ -110,10 +110,16 @@ tell which wallet it caught. Before querying, a client can compare the index
 digest with a second server (`--compare-with`).
 
 A wallet fetches in ticks (`fetch_tick`) of exactly `rounds` rounds.
-Transactions that do not fit wait for the next tick. zcash-devtool ticks on a
-timer by default (every 300 seconds, one round per tick), so it sends the same
-traffic at the same times whether it received nothing or many payments.
-`--once` is an explicit opt-out that reveals when the wallet fetched.
+Transactions that do not fit wait for the next tick.
+
+A wallet MUST start a tick unconditionally: after every sync, or on a fixed
+timer, and never because a sync found something. A wallet MUST NOT send more
+rounds when it wants more transactions. The test
+`plan::tests::tick_shape_is_independent_of_wants` checks the second rule;
+integrators should keep it passing.
+
+zcash-devtool runs one tick per `enhance` call (run it after every `sync`), or
+with `--every N` one tick every N seconds while it keeps running.
 
 ## What the server learns
 
