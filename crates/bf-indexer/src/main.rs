@@ -295,12 +295,17 @@ fn build(net: Net, first_height: u32, dir: &std::path::Path) -> anyhow::Result<(
     let store = Store::open(dir, first_height)?;
     let mut packer = Packer::new(net.core(), first_height);
     let (mut n, mut mined, mut largest) = (0usize, 0u64, 0u32);
+    let params = net.params();
     for rec in store.records()? {
         let rec = rec?;
-        packer.push(rec.key, &rec.bytes);
+        // Records from older builds may still carry signatures; drop them
+        // now, with the txid checked again. One that fails stays as stored.
+        let branch = BranchId::for_height(&params, BlockHeight::from_u32(rec.key.height));
+        let bytes = bf_tx::slim(&rec.bytes, branch).unwrap_or(rec.bytes);
+        largest = largest.max(bytes.len() as u32);
+        packer.push(rec.key, &bytes);
         n += 1;
         mined += u64::from(rec.original_len);
-        largest = largest.max(rec.bytes.len() as u32);
     }
     packer.covered_through(store.next_height().saturating_sub(1));
     let (index, rows) = packer.finish();

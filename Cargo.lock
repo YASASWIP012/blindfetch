@@ -753,9 +753,13 @@ dependencies = [
  "bf-core",
  "hex",
  "orchard",
+ "redjubjub",
+ "sapling-crypto",
  "thiserror 2.0.21",
  "zcash_primitives",
  "zcash_protocol",
+ "zcash_script",
+ "zcash_transparent",
 ]
 
 [[package]]
@@ -6054,6 +6058,7 @@ checksum = "19ff57b3369b472353110bea305ced2612a1380e2d2079dd26c200ed42064421"
 dependencies = [
  "rand_core 0.10.1",
  "reddsa",
+ "serde",
  "thiserror 2.0.21",
  "zeroize",
 ]

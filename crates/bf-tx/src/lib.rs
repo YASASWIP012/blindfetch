@@ -60,27 +60,83 @@ pub struct Stripped {
 #[cfg(feature = "strip")]
 pub fn strip(raw: &[u8], branch: BranchId) -> Result<Stripped, Error> {
     let tx = Transaction::read(raw, branch)?;
-    let txid = tx.txid();
-    if matches!(tx.version(), TxVersion::V4) {
-        return Ok(Stripped { txid, bytes: bf_core::zeros::encode(raw), original_len: raw.len() });
+    Ok(Stripped { txid: tx.txid(), bytes: zero_auth(tx)?, original_len: raw.len() })
+}
+
+/// Re-strips bytes that an older indexer stored, zeroing anything it left in.
+/// The txid check runs again, so a stored record that does not survive this
+/// is reported, never silently changed.
+#[cfg(feature = "strip")]
+pub fn slim(stored: &[u8], branch: BranchId) -> Result<Vec<u8>, Error> {
+    zero_auth(Transaction::read(&expand(stored)?[..], branch)?)
+}
+
+/// Transparent script signatures sit outside the v5/v6 txid too. Shielding
+/// transactions often carry dozens of them.
+#[cfg(feature = "strip")]
+struct ZeroScriptSigs;
+
+#[cfg(feature = "strip")]
+impl transparent::bundle::MapAuth<transparent::bundle::Authorized, transparent::bundle::Authorized>
+    for ZeroScriptSigs
+{
+    fn map_script_sig(&self, s: transparent::address::Script) -> transparent::address::Script {
+        transparent::address::Script(zcash_script::script::Code(vec![0; s.0.0.len()]))
     }
 
-    let without_proofs = |bundle: Option<orchard::Bundle<BundleAuthorized, _>>| {
+    fn map_authorization(&self, a: transparent::bundle::Authorized) -> transparent::bundle::Authorized {
+        a
+    }
+}
+
+/// Zeroes every proof and signature the txid does not commit to, keeping
+/// their lengths so the transaction still parses, then collapses the zeros.
+#[cfg(feature = "strip")]
+fn zero_auth(tx: Transaction) -> Result<Vec<u8>, Error> {
+    use orchard::primitives::redpallas;
+
+    let txid = tx.txid();
+    if matches!(tx.version(), TxVersion::V4) {
+        // v4 txids cover Sapling proofs, so nothing can be dropped.
+        let mut raw = Vec::new();
+        tx.write(&mut raw)?;
+        return Ok(bf_core::zeros::encode(&raw));
+    }
+
+    let orchard_like = |bundle: Option<orchard::Bundle<BundleAuthorized, _>>| {
         bundle.map(|b| {
             b.map_authorization(
                 &mut (),
-                |_, _, sig| sig,
+                |_, _, _sig| redpallas::Signature::<redpallas::SpendAuth>::from([0u8; 64]),
                 |_, auth: BundleAuthorized| {
                     let len = auth.proof().as_ref().len();
-                    BundleAuthorized::from_parts(Proof::new(vec![0; len]), auth.binding_signature().clone())
+                    BundleAuthorized::from_parts(
+                        Proof::new(vec![0; len]),
+                        redpallas::Signature::<redpallas::Binding>::from([0u8; 64]),
+                    )
                 },
             )
         })
     };
-    let data = tx
+    let sapling_like = |bundle: Option<sapling::Bundle<sapling::bundle::Authorized, _>>| {
+        bundle.map(|b| {
+            b.map_authorization(
+                (),
+                |_, _| [0u8; 192],
+                |_, _| [0u8; 192],
+                |_, _| redjubjub::Signature::<redjubjub::SpendAuth>::from([0u8; 64]),
+                |_, _| sapling::bundle::Authorized { binding_sig: redjubjub::Signature::from([0u8; 64]) },
+            )
+        })
+    };
+    let transparent_like =
+        |bundle: Option<transparent::bundle::Bundle<transparent::bundle::Authorized>>| {
+            bundle.map(|b| b.map_authorization(ZeroScriptSigs))
+        };
+    let stripped = tx
         .into_data()
-        .map_bundles::<Authorized>(|t| t, |s| s, without_proofs);
-    let stripped = data.freeze()?;
+        .map_bundles::<Authorized>(transparent_like, sapling_like, orchard_like)
+        .freeze()?;
 
     // Dropping authorizing data must not change the txid. If it ever does,
     // the indexer would publish rows no wallet could verify.
@@ -88,9 +144,9 @@ pub fn strip(raw: &[u8], branch: BranchId) -> Result<Stripped, Error> {
     if actual != txid {
         return Err(Error::TxidMismatch { expected: txid, actual });
     }
-    let mut zeroed = Vec::with_capacity(raw.len());
+    let mut zeroed = Vec::new();
     stripped.write(&mut zeroed)?;
-    Ok(Stripped { txid, bytes: bf_core::zeros::encode(&zeroed), original_len: raw.len() })
+    Ok(bf_core::zeros::encode(&zeroed))
 }
 
 /// Parses stripped bytes and checks them against the txid the wallet asked
