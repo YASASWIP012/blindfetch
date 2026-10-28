@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Runs Blindfetch on this Mac and keeps it reachable:
-#   - one indexer per network, following the chain
-#   - one server per network, on 8484 (mainnet) and 8485 (testnet)
-#   - one Cloudflare quick tunnel per server
+#   - a mainnet indexer, following the chain
+#   - a mainnet server on 8484
+#   - a Cloudflare quick tunnel to it
 #   - redeploys the Vercel site whenever a tunnel address changes
 # and keeps the Mac awake while it runs. Logs go to ~/Library/Logs/blindfetch.
 set -uo pipefail
@@ -47,13 +47,13 @@ tunnel() {
 }
 
 while true; do
-  for net in main test; do start_indexer "$net"; start_server "$net"; done
+  start_indexer main
+  start_server main
   main_url=$(tunnel main)
-  test_url=$( [ -f "$ROOT/data/test/index.bin" ] && tunnel test || echo "$main_url")
-  current="$main_url $test_url"
+  current="$main_url"
   if [ -n "$main_url" ] && [ "$current" != "$(cat "$STATE/current" 2>/dev/null)" ]; then
-    echo "$(date -u) tunnels: $current" >>"$LOGS/site.log"
-    if "$ROOT/deploy/mac/site.sh" "$main_url" "$test_url" >>"$LOGS/site.log" 2>&1; then
+    echo "$(date -u) tunnel: $current" >>"$LOGS/site.log"
+    if "$ROOT/deploy/mac/site.sh" "$main_url" >>"$LOGS/site.log" 2>&1; then
       echo "$current" >"$STATE/current"
     fi
   fi
