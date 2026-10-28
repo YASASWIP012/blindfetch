@@ -20,12 +20,18 @@ clip() { # name image seconds [audio]
 }
 
 clip title frames/title.png 3
-for s in s1 s2 s3 s4 s5; do
-  img=frames/$s.png; [ -f "$img" ] || img=frames/s2.png
-  clip "$s" "$img" "$(python3 -c "print($(dur vo/$s.mp3)+0.7)")" "vo/$s.mp3"
+for s in s1 s2 s3 s5; do
+  clip "$s" "frames/$s.png" "$(python3 -c "print($(dur vo/$s.mp3)+0.7)")" "vo/$s.mp3"
 done
+# Scene 4 is the live page: the fetch, then what each server learned.
+s4=$(python3 -c "print($(dur vo/s4.mp3)+0.7)")
+half=$(python3 -c "print($s4/2)")
+ffmpeg -y -v error -i vo/s4.mp3 -t "$half" out/s4a.wav
+ffmpeg -y -v error -ss "$half" -i vo/s4.mp3 out/s4b.wav
+clip s4a frames/s4-raw.png "$half" out/s4a.wav
+clip s4b frames/s4-raw-b.png "$(python3 -c "print($s4-$half)")" out/s4b.wav
 clip s6 frames/s6.png "$(python3 -c "print($(dur vo/s6.mp3)+2.0)")" vo/s6.mp3
 
-printf "file 'clips/%s.mp4'\n" title s1 s2 s3 s4 s5 s6 > out/list.txt
+printf "file 'clips/%s.mp4'\n" title s1 s2 s3 s4a s4b s5 s6 > out/list.txt
 ffmpeg -y -v error -f concat -safe 0 -i out/list.txt -c copy out/blindfetch-demo.mp4
 echo "done: out/blindfetch-demo.mp4 $(dur out/blindfetch-demo.mp4)s"

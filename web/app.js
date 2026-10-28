@@ -123,8 +123,8 @@ async function pollSeen(once) {
     const lines = rows.slice(0, 12).map((r) => {
       const t = new Date(r.at * 1000).toISOString().slice(11, 16);
       return r.kind === 'query'
-        ? `${t}  POST /v1/query  ${r.queries} queries  in ${fmtBytes(r.bytes_in)}  out ${fmtBytes(r.bytes_out)}`
-        : `${t}  GET  /v1/index  out ${fmtBytes(r.bytes_out)}`;
+        ? `${t}  query  ${r.queries} queries  in ${fmtBytes(r.bytes_in)}  out ${fmtBytes(r.bytes_out)}`
+        : `${t}  index  out ${fmtBytes(r.bytes_out)}`;
     });
     $('seen').textContent = lines.length ? lines.join('\n') : 'No requests yet.';
   } catch {

@@ -37,8 +37,15 @@ for (let i = 0; i < 120 && !done; i++) {
   done = /txid/.test(r?.result?.value || "");
 }
 await sleep(2500);
+await send("Runtime.evaluate", { expression: "document.getElementById('result').scrollIntoView({block:'start'}); window.scrollBy(0,-40)" });
+await sleep(600);
 const shot = await send("Page.captureScreenshot", { format: "png" });
 writeFileSync(out, Buffer.from(shot.data, "base64"));
+// Second shot: what each server learned, side by side.
+await send("Runtime.evaluate", { expression: "document.querySelector('.split').scrollIntoView({block:'center'})" });
+await sleep(1500);
+const shot2 = await send("Page.captureScreenshot", { format: "png" });
+writeFileSync(out.replace(/\.png$/, "-b.png"), Buffer.from(shot2.data, "base64"));
 console.log(done ? "captured after fetch" : "captured without a finished fetch", out);
 ws.close();
 chrome.kill();
