@@ -57,6 +57,8 @@ pub enum Fetched {
     /// Not in the database: mined before Ironwood activation, after the
     /// database's last height, or carrying no shielded output.
     NotCovered,
+    /// Left for the next tick of a fixed schedule.
+    Deferred,
 }
 
 fn random_u64() -> u64 {
@@ -164,15 +166,68 @@ impl Blindfetch {
         Ok(stats)
     }
 
-    /// Fetches and verifies the wanted transactions.
+    /// Fetches and verifies the wanted transactions, in as many rounds as
+    /// they need (at least `MIN_ROUNDS`).
     pub async fn fetch<P: Parameters>(
         &self,
         params: &P,
         wants: &[Want],
     ) -> anyhow::Result<(Vec<(Want, Fetched)>, Vec<RoundStats>)> {
-        let located: Vec<(Want, Option<Entry>)> = wants.iter().map(|w| (*w, self.locate(w.key))).collect();
-        let needed = located.iter().filter_map(|(_, e)| *e).flat_map(|e| e.rows());
-        let plan = QueryPlan::new(needed, self.info.num_rows, self.info.batch, bf_core::MIN_ROUNDS, random_u64);
+        self.fetch_inner(params, wants, None).await
+    }
+
+    /// One tick of a fixed schedule: exactly `rounds` rounds, whatever is
+    /// wanted. Transactions that do not fit wait for the next tick and come
+    /// back as `Deferred`. A wallet that calls this on a timer sends the same
+    /// traffic whether it received nothing or many payments, so even the fact
+    /// that it fetched says nothing.
+    pub async fn fetch_tick<P: Parameters>(
+        &self,
+        params: &P,
+        wants: &[Want],
+        rounds: usize,
+    ) -> anyhow::Result<(Vec<(Want, Fetched)>, Vec<RoundStats>)> {
+        self.fetch_inner(params, wants, Some(rounds)).await
+    }
+
+    async fn fetch_inner<P: Parameters>(
+        &self,
+        params: &P,
+        wants: &[Want],
+        fixed_rounds: Option<usize>,
+    ) -> anyhow::Result<(Vec<(Want, Fetched)>, Vec<RoundStats>)> {
+        let mut located: Vec<(Want, Option<Entry>)> = wants.iter().map(|w| (*w, self.locate(w.key))).collect();
+        // On a fixed schedule, take whole transactions in chain order until
+        // the tick's capacity is used; the rest wait.
+        let mut deferred = Vec::new();
+        if let Some(rounds) = fixed_rounds {
+            let capacity = rounds * self.info.batch;
+            let mut taken = std::collections::BTreeSet::new();
+            located.sort_by_key(|(w, _)| w.key);
+            let mut keep = Vec::new();
+            for (w, e) in located {
+                match e {
+                    Some(entry) => {
+                        let mut with: std::collections::BTreeSet<usize> = taken.clone();
+                        with.extend(entry.rows());
+                        if with.len() <= capacity {
+                            taken = with;
+                            keep.push((w, Some(entry)));
+                        } else {
+                            deferred.push(w);
+                        }
+                    }
+                    None => keep.push((w, None)),
+                }
+            }
+            located = keep;
+        }
+        let needed: Vec<usize> = located.iter().filter_map(|(_, e)| *e).flat_map(|e| e.rows()).collect();
+        let min_rounds = fixed_rounds.unwrap_or(bf_core::MIN_ROUNDS);
+        let plan = QueryPlan::new(needed, self.info.num_rows, self.info.batch, min_rounds, random_u64);
+        if let Some(rounds) = fixed_rounds {
+            ensure!(plan.batches.len() == rounds, "planned {} rounds for a {rounds}-round tick", plan.batches.len());
+        }
 
         let mut rows = std::collections::HashMap::new();
         let mut stats = Vec::new();
@@ -200,6 +255,7 @@ impl Blindfetch {
             let tx = bf_tx::verify(&bytes, want.txid, branch).map_err(|_| anyhow!(UNTRUSTED))?;
             out.push((want, Fetched::Found(Box::new(tx))));
         }
+        out.extend(deferred.into_iter().map(|w| (w, Fetched::Deferred)));
         Ok((out, stats))
     }
 }
