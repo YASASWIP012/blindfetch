@@ -86,7 +86,7 @@ cargo build --release -p bf-indexer -p bf-server -p zcash-devtool
 | `bf-server` | `/v1/info`, `/v1/index`, `/v1/query`, and `/v1/seen`, its own request log. |
 | `bf-client` | What a wallet links. |
 | `bf-wasm` + `web/` | The browser demo. |
-| `vendor/zcash-devtool` | Upstream zcash-devtool with `enhance --blindfetch`. The change alone is in `patches/`. |
+| `vendor/zcash-devtool` | Upstream zcash-devtool with `enhance --blindfetch`. The change alone is in `patches/`, and is open upstream as [zcash/zcash-devtool#270](https://github.com/zcash/zcash-devtool/pull/270). |
 
 ## Measured
 

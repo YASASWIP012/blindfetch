@@ -25,8 +25,10 @@ demo is simulated or replayed.
   the author. If the server is ever unreachable, the page says so and shows a
   recorded run, labelled as a recording. The steps to run your own are in
   `deploy/`.
-- **Wallets.** The only wallet integration is zcash-devtool. Zodl, Zingo and
-  other wallets would need the change described in `docs/INTEGRATION.md`.
+- **Wallets.** The only wallet integration is zcash-devtool, opened upstream
+  as [zcash/zcash-devtool#270](https://github.com/zcash/zcash-devtool/pull/270)
+  on 28 October and not merged. Zodl, Zingo and other wallets would need the
+  change described in `docs/INTEGRATION.md`.
 - **No faucet coins.** The testnet faucet was not paying out on 28 October, so
   the wallet demo uses a published mainnet viewing key instead of a wallet of
   our own.
