@@ -50,24 +50,22 @@ pub(crate) struct Command {
     #[arg(long, requires = "blindfetch")]
     compare_with: Option<String>,
 
-    /// Rounds per tick with --every.
-    #[arg(long, default_value_t = 2, requires = "every")]
+    /// Rounds per fetch (per tick with --every). Every fetch sends exactly
+    /// this many; transactions that do not fit wait for the next one.
+    #[arg(long, default_value_t = 2, requires = "blindfetch")]
     rounds: usize,
 }
 
-/// One fetch: on a fixed schedule exactly `rounds` rounds, otherwise as many
-/// as the wanted transactions need.
+/// One fetch, always exactly `rounds` rounds, so the traffic never depends
+/// on how many transactions the wallet wanted. What does not fit waits for
+/// the next tick or the next run.
 async fn blindfetch_once<P: Parameters>(
     bf: &bf_client::Blindfetch,
     params: &P,
     wants: &[bf_client::Want],
-    every: Option<u64>,
     rounds: usize,
 ) -> anyhow::Result<(Vec<(bf_client::Want, bf_client::Fetched)>, Vec<bf_client::RoundStats>)> {
-    match every {
-        Some(_) => bf.fetch_tick(params, wants, rounds).await,
-        None => bf.fetch(params, wants).await,
-    }
+    bf.fetch_tick(params, wants, rounds).await
 }
 
 /// Where the wallet saw a transaction mined, which is all a Blindfetch server
@@ -209,10 +207,10 @@ impl Command {
 
                 // A rebuilt database is the one failure worth retrying, once.
                 // Any other failure means the server misbehaved: lock it out.
-                let outcome = match blindfetch_once(&bf, &params, &wants, self.every, self.rounds).await {
+                let outcome = match blindfetch_once(&bf, &params, &wants, self.rounds).await {
                     Err(e) if e.to_string().contains("rebuilt its database") => {
                         bf = bf_client::Blindfetch::connect(url).await?;
-                        blindfetch_once(&bf, &params, &wants, self.every, self.rounds).await
+                        blindfetch_once(&bf, &params, &wants, self.rounds).await
                     }
                     other => other,
                 };
@@ -274,7 +272,7 @@ impl Command {
                     down as f64 / 1048576.0,
                 );
                 if waiting > 0 {
-                    println!("{waiting} more wait for the next tick.");
+                    println!("{waiting} more did not fit in this fetch and wait for the next one.");
                 }
                 println!("lightwalletd was not asked for any of them.");
 

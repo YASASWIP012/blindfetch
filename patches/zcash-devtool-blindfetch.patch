@@ -12,7 +12,7 @@ index 3aa6c5e..69bc22e 100644
  bip32 = { version = "0.6", default-features = false, features = ["secp256k1-ffi"] }
  futures-util = "0.3"
 diff --git a/src/commands/wallet/enhance.rs b/src/commands/wallet/enhance.rs
-index 137443a..310bf49 100644
+index 137443a..225cda7 100644
 --- a/src/commands/wallet/enhance.rs
 +++ b/src/commands/wallet/enhance.rs
 @@ -1,6 +1,7 @@
@@ -23,7 +23,7 @@ index 137443a..310bf49 100644
  use clap::Args;
  use futures_util::StreamExt;
  use rand::{rand_core::UnwrapErr, rngs::SysRng};
-@@ -27,6 +28,66 @@ use crate::{config::get_wallet_network, data::get_db_paths, remote::ConnectionAr
+@@ -27,6 +28,64 @@ use crate::{config::get_wallet_network, data::get_db_paths, remote::ConnectionAr
  pub(crate) struct Command {
      #[command(flatten)]
      connection: ConnectionArgs,
@@ -49,24 +49,22 @@ index 137443a..310bf49 100644
 +    #[arg(long, requires = "blindfetch")]
 +    compare_with: Option<String>,
 +
-+    /// Rounds per tick with --every.
-+    #[arg(long, default_value_t = 2, requires = "every")]
++    /// Rounds per fetch (per tick with --every). Every fetch sends exactly
++    /// this many; transactions that do not fit wait for the next one.
++    #[arg(long, default_value_t = 2, requires = "blindfetch")]
 +    rounds: usize,
 +}
 +
-+/// One fetch: on a fixed schedule exactly `rounds` rounds, otherwise as many
-+/// as the wanted transactions need.
++/// One fetch, always exactly `rounds` rounds, so the traffic never depends
++/// on how many transactions the wallet wanted. What does not fit waits for
++/// the next tick or the next run.
 +async fn blindfetch_once<P: Parameters>(
 +    bf: &bf_client::Blindfetch,
 +    params: &P,
 +    wants: &[bf_client::Want],
-+    every: Option<u64>,
 +    rounds: usize,
 +) -> anyhow::Result<(Vec<(bf_client::Want, bf_client::Fetched)>, Vec<bf_client::RoundStats>)> {
-+    match every {
-+        Some(_) => bf.fetch_tick(params, wants, rounds).await,
-+        None => bf.fetch(params, wants).await,
-+    }
++    bf.fetch_tick(params, wants, rounds).await
 +}
 +
 +/// Where the wallet saw a transaction mined, which is all a Blindfetch server
@@ -90,7 +88,7 @@ index 137443a..310bf49 100644
  }
  
  fn parse_raw_transaction<P: Parameters>(
-@@ -56,6 +117,8 @@ async fn fetch_transaction<P: Parameters>(
+@@ -56,6 +115,8 @@ async fn fetch_transaction<P: Parameters>(
          hash: txid.as_ref().to_vec(),
          ..Default::default()
      };
@@ -99,7 +97,7 @@ index 137443a..310bf49 100644
  
      let raw_tx = match client.get_transaction(request).await {
          Ok(response) => Ok(Some(response.into_inner())),
-@@ -76,9 +139,9 @@ async fn fetch_transaction<P: Parameters>(
+@@ -76,9 +137,9 @@ async fn fetch_transaction<P: Parameters>(
  impl Command {
      pub(crate) async fn run(self, wallet_dir: Option<String>) -> Result<(), anyhow::Error> {
          let params = get_wallet_network(wallet_dir.as_ref())?;
@@ -111,7 +109,7 @@ index 137443a..310bf49 100644
          let chain_tip = db_data.chain_height()?.ok_or_else(|| {
              anyhow!("Chain height must be available to perform transaction enhancement.")
          })?;
-@@ -91,6 +154,146 @@ impl Command {
+@@ -91,6 +152,146 @@ impl Command {
          let mut client = self.connection.connect(params, wallet_dir.as_ref()).await?;
  
          let mut satisfied_requests = BTreeSet::new();
@@ -170,10 +168,10 @@ index 137443a..310bf49 100644
 +
 +                // A rebuilt database is the one failure worth retrying, once.
 +                // Any other failure means the server misbehaved: lock it out.
-+                let outcome = match blindfetch_once(&bf, &params, &wants, self.every, self.rounds).await {
++                let outcome = match blindfetch_once(&bf, &params, &wants, self.rounds).await {
 +                    Err(e) if e.to_string().contains("rebuilt its database") => {
 +                        bf = bf_client::Blindfetch::connect(url).await?;
-+                        blindfetch_once(&bf, &params, &wants, self.every, self.rounds).await
++                        blindfetch_once(&bf, &params, &wants, self.rounds).await
 +                    }
 +                    other => other,
 +                };
@@ -235,7 +233,7 @@ index 137443a..310bf49 100644
 +                    down as f64 / 1048576.0,
 +                );
 +                if waiting > 0 {
-+                    println!("{waiting} more wait for the next tick.");
++                    println!("{waiting} more did not fit in this fetch and wait for the next one.");
 +                }
 +                println!("lightwalletd was not asked for any of them.");
 +
@@ -258,7 +256,7 @@ index 137443a..310bf49 100644
          loop {
              let mut new_request_encountered = false;
              for data_request in db_data.transaction_data_requests()? {
-@@ -114,6 +317,10 @@ impl Command {
+@@ -114,6 +315,10 @@ impl Command {
                          info!("Got status {:?}", status);
                          db_data.set_transaction_status(*txid, status)?;
                      }

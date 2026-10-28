@@ -76,9 +76,11 @@ version above its own chain tip, and `--compare-with` refuses one that a
 second operator does not serve. Without a second operator, a server can still
 pick among recent heights to tag clients.
 
-**Counting rounds.** Without a fixed schedule, a wallet that needs more rows
-sends more rounds, so the server learns an upper bound on how many rows it
-fetched. `fetch_tick` and `enhance --every` remove this.
+**Counting rounds.** zcash-devtool sends exactly `--rounds` rounds (2 by
+default) on every fetch, one-off runs included, and leaves what does not fit
+for the next fetch. The number of rounds never depends on how many
+transactions the wallet wanted. The library's `fetch` (rounds as needed, at
+least two) remains for tools that do not care, such as the benchmark.
 
 **Timing.** A wallet that fetches right after a payment arrives reveals that
 something arrived. The fixed schedule removes this too.

@@ -109,9 +109,10 @@ fixed schedule it keeps sending dummy-only ticks to it, so the server cannot
 tell which wallet it caught. Before querying, a client can compare the index
 digest with a second server (`--compare-with`).
 
-On a fixed schedule (`fetch_tick`), every tick is exactly `rounds` rounds.
-Transactions that do not fit wait for the next tick. A wallet that ticks on a
-timer sends the same traffic whether it received nothing or many payments.
+A wallet fetches in ticks (`fetch_tick`) of exactly `rounds` rounds.
+Transactions that do not fit wait for the next tick. zcash-devtool uses ticks
+for every fetch, and with `--every` it ticks on a timer, so it sends the same
+traffic whether it received nothing or many payments.
 
 ## What the server learns
 
