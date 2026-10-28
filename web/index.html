@@ -185,7 +185,7 @@ or the chain; stop using it</pre></div>
                     <pre id="seen" class="log">Loading…</pre>
                   </div>
                 </div>
-                <p class="t-micro note">The server runs on the author's laptop behind a free tunnel, so a round takes several seconds. Your address and the time of each request reach it, as with any server.</p>
+                <p class="t-micro note">The server is one small cloud machine, so a round takes a few seconds. Your address and the time of each request reach it, as with any server.</p>
               </div>
             </div>
           </div>
@@ -219,7 +219,7 @@ or the chain; stop using it</pre></div>
           <details><summary>Why not download every transaction?</summary><p>That is about 8 MB per day of chain, so a wallet offline for a week would download about 55 MB. A Blindfetch round is about 4 MB up and 0.5 MB down, once per sync.</p></details>
           <details><summary>What about memos from before Ironwood?</summary><p>They are not in the database. In Blindfetch mode zcash-devtool leaves them pending and never sends their txids to lightwalletd.</p></details>
           <details><summary>Which wallets can use it?</summary><p>zcash-devtool today. Any wallet built on librustzcash answers the same enhancement request, and the integration guide shows the change.</p></details>
-          <details><summary>Who runs the server?</summary><p>For this demo, the author, on a laptop. Anyone can run one with a lightwalletd endpoint, and wallets can compare two servers' indexes before trusting either.</p></details>
+          <details><summary>Who runs the server?</summary><p>For this demo, the author, on one small cloud machine. Anyone can run one with a lightwalletd endpoint, and wallets can compare two servers' indexes before trusting either.</p></details>
         </div>
       </div>
     </section>

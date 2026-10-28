@@ -105,8 +105,8 @@ never falls back to lightwalletd for them unless `--allow-fallback` is given.
 
 **Network address.** PIR does nothing for the IP address. Run the client over
 Tor or a relay if that matters. The server does not log addresses. The public
-demo is proxied through Vercel and Cloudflare, which see addresses as any proxy
-does.
+demo is proxied through Vercel, which sees addresses as any proxy does, and
+Caddy on the server writes no access log.
 
 ## Out of scope
 

@@ -17,7 +17,7 @@ mkdir -p "$ROOT/.site"
 if ! mkdir "$LOCK" 2>/dev/null; then echo "another deploy is running"; exit 1; fi
 trap 'rmdir "$LOCK"' EXIT
 rm -rf "$SITE" && mkdir -p "$SITE/pkg"
-cp "$ROOT"/web/{index.html,app.js,style.css,foundation.css} "$SITE/"
+cp "$ROOT"/web/{index.html,app.js,style.css,foundation.css,recorded.json} "$SITE/"
 cp "$ROOT"/web/pkg/bf_wasm.js "$ROOT"/web/pkg/bf_wasm_bg.wasm "$SITE/pkg/"
 printf '{ "main": "%s" }\n' "$MAIN" > "$SITE/server.json"
 cat > "$SITE/vercel.json" <<JSON

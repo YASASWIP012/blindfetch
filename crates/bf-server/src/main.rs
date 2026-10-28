@@ -46,6 +46,11 @@ struct Cli {
     /// How often to look for a rebuilt database.
     #[arg(long, default_value_t = 120)]
     reload_secs: u64,
+    /// On a rebuilt database, exit instead of loading a second copy beside the
+    /// first. Run under a service manager that restarts it; the server is
+    /// down for the minute or two a load takes.
+    #[arg(long)]
+    low_memory: bool,
 }
 
 struct Db {
@@ -208,7 +213,7 @@ async fn seen(State(app): State<Arc<AppState>>) -> Json<Vec<Seen>> {
 }
 
 /// Swaps in a rebuilt database when the indexer writes a new index.bin.
-fn spawn_reloader(app: Arc<AppState>, dir: PathBuf, every: Duration) {
+fn spawn_reloader(app: Arc<AppState>, dir: PathBuf, every: Duration, low_memory: bool) {
     std::thread::spawn(move || {
         let mtime = |p: &Path| std::fs::metadata(p).and_then(|m| m.modified()).ok();
         let mut last = mtime(&dir.join("index.bin"));
@@ -220,6 +225,13 @@ fn spawn_reloader(app: Arc<AppState>, dir: PathBuf, every: Duration) {
             }
             // Let the indexer finish writing rows.bin before reading.
             std::thread::sleep(Duration::from_secs(5));
+            if low_memory {
+                // Freed memory does not reliably go back to the system, so a
+                // second copy in the same process ends in swap. Exit and let
+                // the service manager start a fresh process on the new files.
+                info!("rebuilt database found; exiting so a fresh process loads it");
+                std::process::exit(0);
+            }
             match load(&dir, app.batch) {
                 Ok(db) => {
                     *app.db.write().unwrap() = Arc::new(db);
@@ -246,7 +258,7 @@ async fn main() -> anyhow::Result<()> {
         batch: cli.batch,
         busy: tokio::sync::Semaphore::new(2),
     });
-    spawn_reloader(app.clone(), cli.data.clone(), Duration::from_secs(cli.reload_secs));
+    spawn_reloader(app.clone(), cli.data.clone(), Duration::from_secs(cli.reload_secs), cli.low_memory);
 
     // Only the index is compressed. Query responses stay a fixed size, which
     // compression could break.

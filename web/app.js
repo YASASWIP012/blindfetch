@@ -28,6 +28,7 @@ let net = 'main';
 let session = null;
 let seenTimer = null;
 let batch = 4;
+let recorded = false;
 
 const fmtBytes = (n) => n >= 1048576 ? `${(n / 1048576).toFixed(1)} MiB` : n >= 1024 ? `${(n / 1024).toFixed(0)} KiB` : `${n} B`;
 const fmtNum = (n) => n.toLocaleString('en-US');
@@ -60,7 +61,8 @@ async function connect() {
     // should show the whole round trip without a click.
     if (new URLSearchParams(location.search).has('auto')) fetchPrivately();
   } catch (e) {
-    $('status').textContent = `Could not reach the server: ${e.message || e}. It runs on a laptop and may be asleep; the README shows how to run your own.`;
+    $('status').textContent = `Could not reach the server: ${e.message || e}. Below is a recorded run against the same server; the README shows how to run your own.`;
+    showRecorded();
   }
   pollSeen();
 }
@@ -129,6 +131,30 @@ async function fetchPrivately() {
   }
 }
 
+// When the server is unreachable, show a real run recorded from this page so
+// a visitor still sees what a fetch sends and gets back. It is labelled as a
+// recording; nothing here pretends to be live.
+async function showRecorded() {
+  try {
+    const r = await (await fetch('recorded.json', { cache: 'no-store' })).json();
+    const out = $('result');
+    out.hidden = false;
+    out.innerHTML = `
+      <p class="bad">Recorded run, ${esc(r.recorded_at)}. Not live.</p>
+      <dl class="stats">
+        <div><dt>Database</dt><dd>${esc(fmtNum(r.transactions))} transactions</dd></div>
+        <div><dt>Sent</dt><dd>${esc(r.queries)} queries, ${esc(r.sent)}</dd></div>
+        <div><dt>Received</dt><dd>${esc(r.received)}</dd></div>
+        <div><dt>Round trip</dt><dd>${esc(r.round_trip_ms)} ms</dd></div>
+      </dl>
+      <p><strong>txid</strong> <code class="wrapcode">${esc(r.txid)}</code></p>
+      <p class="muted">${esc(r.summary)}</p>
+      <pre class="log">${r.ciphertexts.map((c, k) => `action ${k}: ${esc(c)}…`).join('\n')}</pre>`;
+    $('seen').textContent = r.seen.join('\n');
+    recorded = true;
+  } catch { /* nothing recorded */ }
+}
+
 async function pollSeen(once) {
   clearTimeout(seenTimer);
   try {
@@ -141,7 +167,7 @@ async function pollSeen(once) {
     });
     $('seen').textContent = lines.length ? lines.join('\n') : 'No requests yet.';
   } catch {
-    $('seen').textContent = 'Server unreachable.';
+    if (!recorded) $('seen').textContent = 'Server unreachable.';
   }
   if (!once) seenTimer = setTimeout(pollSeen, 5000);
 }

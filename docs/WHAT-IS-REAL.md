@@ -19,10 +19,12 @@ demo is simulated or replayed.
 
 ## Not real, or not yet
 
-- **Hosting.** The public server runs on the author's laptop behind a free
-  Cloudflare tunnel, with Vercel proxying a stable address to it. The project
-  had no budget for a server. If the laptop is asleep the demo is down; the
-  code and the steps to run it yourself are in the README.
+- **Hosting.** The public server is one Azure VM (2 vCPU, 8 GB, Korea
+  Central) paid from a student credit, with Caddy in front and access logs
+  turned off. Vercel proxies a stable address to it. There is one operator:
+  the author. If the server is ever unreachable, the page says so and shows a
+  recorded run, labelled as a recording. The steps to run your own are in
+  `deploy/`.
 - **Wallets.** The only wallet integration is zcash-devtool. Zodl, Zingo and
   other wallets would need the change described in `docs/INTEGRATION.md`.
 - **No faucet coins.** The testnet faucet was not paying out on 28 October, so

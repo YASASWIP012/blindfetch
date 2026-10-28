@@ -101,7 +101,7 @@ Read [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) and
 [docs/WHAT-IS-REAL.md](docs/WHAT-IS-REAL.md). In short: transactions mined
 before Ironwood activation are not covered, the newest blocks are covered once
 the server catches up, PIR does nothing for your IP address, and the public
-server runs on a laptop because the project had no budget for hosting.
+server is one small cloud machine run by the author.
 
 ## License
 

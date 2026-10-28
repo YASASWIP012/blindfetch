@@ -6,7 +6,8 @@ After=network-online.target
 User=ubuntu
 WorkingDirectory=/home/ubuntu/blindfetch
 EnvironmentFile=/home/ubuntu/blindfetch/deploy/%i.env
-ExecStart=/home/ubuntu/blindfetch/target/release/${BIN} ${ARGS}
+# systemd does not expand variables in the program path, so go through sh.
+ExecStart=/bin/sh -c 'exec /home/ubuntu/blindfetch/target/release/$BIN $ARGS'
 Restart=always
 RestartSec=5
 

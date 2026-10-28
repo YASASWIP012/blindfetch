@@ -64,6 +64,7 @@ database:
 | Full mainnet database (410,977 transactions, 65,536 rows), client and server on the same laptop, under memory pressure | 4.06 MiB | 0.47 MiB | 4.6 s |
 | Client and server on the same machine | 2.13 MiB | 0.47 MiB | 0.6 s |
 | Through the public URL (Vercel, Cloudflare tunnel, home connection) | 2.13 MiB | 0.47 MiB | 6 to 9 s |
+| Through the public URL to the cloud server (Vercel, then an Azure B2as_v2: 2 vCPU, 8 GB), browser in India, 28 Oct | 4.1 MiB | 0.47 MiB | 6.4 s |
 | Browser demo through the public URL | 2.1 MiB | 480 KiB | 6.2 s round trip, 184 ms to build the queries, 55 ms to open the answers |
 
 Public-URL times are dominated by the home connection the server sits on.

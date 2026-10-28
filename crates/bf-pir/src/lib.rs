@@ -112,17 +112,19 @@ mod server {
     /// Server side: one database, precomputed once, answering any number of
     /// queries.
     ///
-    /// YPIR's server borrows its parameters and data for its whole life, so
-    /// both are boxed here and freed only after the server that borrows them.
+    /// YPIR's server borrows its parameters for its whole life, so they are
+    /// boxed here and freed only after the server that borrows them. The raw
+    /// rows are only read while the server builds its own transposed copy, and
+    /// are freed as soon as that is done: keeping them would cost as much
+    /// memory again as the database.
     pub struct Server {
         scenario: Scenario,
         server: ManuallyDrop<YServer<'static, u16>>,
         offline: ManuallyDrop<OfflinePrecomputedValues<'static>>,
         params: *mut spiral_rs::params::Params,
-        data: *mut [u8],
     }
 
-    // The raw pointers are owned boxes that nothing mutates after construction.
+    // The raw pointer is an owned box that nothing mutates after construction.
     unsafe impl Send for Server {}
     unsafe impl Sync for Server {}
 
@@ -132,7 +134,6 @@ mod server {
                 ManuallyDrop::drop(&mut self.server);
                 ManuallyDrop::drop(&mut self.offline);
                 drop(Box::from_raw(self.params));
-                drop(Box::from_raw(self.data));
             }
         }
     }
@@ -146,25 +147,23 @@ mod server {
                 scenario.num_items * scenario.row_bytes()
             );
             let params_ptr = Box::into_raw(Box::new(scenario.params()));
-            let data_ptr = Box::into_raw(rows.into_boxed_slice());
-            // SAFETY: both boxes outlive `server` and `offline`, which Drop
+            // SAFETY: the box outlives `server` and `offline`, which Drop
             // releases first.
             let params: &'static spiral_rs::params::Params = unsafe { &*params_ptr };
-            let data: &'static [u8] = unsafe { &*data_ptr };
             let iter = FilePtIter::new(
-                Cursor::new(data),
+                Cursor::new(rows.as_slice()),
                 scenario.row_bytes(),
                 params.db_cols_simplepir(),
                 params.pt_modulus_bits(),
             );
             let server = YServer::<u16>::new(params, iter, true, false, true);
+            drop(rows);
             let offline = server.perform_offline_precomputation_simplepir(None, None, None);
             Ok(Server {
                 scenario,
                 server: ManuallyDrop::new(server),
                 offline: ManuallyDrop::new(offline),
                 params: params_ptr,
-                data: data_ptr,
             })
         }
 

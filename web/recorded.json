@@ -1,0 +1,18 @@
+{
+  "recorded_at": "28 Oct 2026, from this page against the public server",
+  "transactions": 411448,
+  "queries": 4,
+  "sent": "4.1 MiB",
+  "received": "480 KiB",
+  "round_trip_ms": 6419,
+  "txid": "18b8bf9cca0ed8985a32b0f92ed6ec33c548c5d9c791fc292d64eda4d8dd05e0",
+  "summary": "V6, 2 KiB stored. 2 Ironwood action(s), 0 Orchard, 0 Sapling output(s), 0 transparent in, 1 out.",
+  "ciphertexts": [
+    "f1e2969c8944fc453c8a14897cd3fa08f56e017b78cbc6d4",
+    "73f6b9a40e649acb064958821d979039c72c8b811b15d856"
+  ],
+  "seen": [
+    "19:49  query  4 queries  in 4.1 MiB  out 480 KiB",
+    "19:49  index  out 2.3 MiB"
+  ]
+}
