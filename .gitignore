@@ -1,0 +1,9 @@
+target/
+/vendor/*/target/
+/data/
+*.db
+*.sqlite
+.env
+node_modules/
+dist/
+.DS_Store

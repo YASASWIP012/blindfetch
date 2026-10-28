@@ -1,0 +1,10 @@
+[package]
+name = "bf-core"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Row layout, index format and query padding for Blindfetch"
+
+[dependencies]
+serde.workspace = true
+thiserror.workspace = true

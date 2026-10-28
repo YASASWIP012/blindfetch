@@ -1,0 +1,15 @@
+[package]
+name = "bf-pir"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Thin wrapper over the audited valar-ypir crate: SimplePIR rows in, rows out"
+
+[features]
+default = []
+server = ["ypir/server"]
+
+[dependencies]
+anyhow.workspace = true
+spiral-rs = { version = "=0.5.3-rc.1", package = "valar-spiral-rs" }
+ypir = { version = "0.2.1", package = "valar-ypir", default-features = false }
