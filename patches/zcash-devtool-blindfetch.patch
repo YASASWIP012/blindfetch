@@ -1,0 +1,151 @@
+diff --git a/Cargo.toml b/Cargo.toml
+index 3aa6c5e..69bc22e 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -8,6 +8,8 @@ publish = false
+ 
+ [dependencies]
+ anyhow = "1"
++bf-client = { path = "../../crates/bf-client" }
++bf-core = { path = "../../crates/bf-core" }
+ bip0039 = { version = "0.14", features = ["std", "all-languages"] }
+ bip32 = { version = "0.6", default-features = false, features = ["secp256k1-ffi"] }
+ futures-util = "0.3"
+diff --git a/src/commands/wallet/enhance.rs b/src/commands/wallet/enhance.rs
+index 137443a..ded31f1 100644
+--- a/src/commands/wallet/enhance.rs
++++ b/src/commands/wallet/enhance.rs
+@@ -1,6 +1,7 @@
+ use std::collections::BTreeSet;
+ 
+ use anyhow::anyhow;
++use rusqlite::OptionalExtension;
+ use clap::Args;
+ use futures_util::StreamExt;
+ use rand::{rand_core::UnwrapErr, rngs::SysRng};
+@@ -27,6 +28,36 @@ use crate::{config::get_wallet_network, data::get_db_paths, remote::ConnectionAr
+ pub(crate) struct Command {
+     #[command(flatten)]
+     connection: ConnectionArgs,
++
++    /// Fetch received transactions from this Blindfetch server over PIR
++    /// instead of asking lightwalletd for each txid.
++    #[arg(long)]
++    blindfetch: Option<String>,
++
++    /// With --blindfetch, fetch transactions the Blindfetch database does not
++    /// cover from lightwalletd by txid. This reveals those txids.
++    #[arg(long, requires = "blindfetch")]
++    allow_fallback: bool,
++}
++
++/// Where the wallet saw a transaction mined, which is all a Blindfetch server
++/// needs to be asked for it.
++fn mined_position(
++    db_path: &std::path::Path,
++    txid: &TxId,
++) -> Result<Option<bf_core::TxKey>, anyhow::Error> {
++    let conn = rusqlite::Connection::open_with_flags(db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
++    let row = conn
++        .query_row(
++            "SELECT mined_height, tx_index FROM transactions WHERE txid = ?1",
++            [txid.as_ref().as_slice()],
++            |r| Ok((r.get::<_, Option<u32>>(0)?, r.get::<_, Option<u32>>(1)?)),
++        )
++        .optional()?;
++    Ok(match row {
++        Some((Some(height), Some(tx_index))) => Some(bf_core::TxKey { height, tx_index }),
++        _ => None,
++    })
+ }
+ 
+ fn parse_raw_transaction<P: Parameters>(
+@@ -56,6 +87,8 @@ async fn fetch_transaction<P: Parameters>(
+         hash: txid.as_ref().to_vec(),
+         ..Default::default()
+     };
++    // This is the request Blindfetch replaces: it names the transaction.
++    println!("lightwalletd GetTransaction {txid}");
+ 
+     let raw_tx = match client.get_transaction(request).await {
+         Ok(response) => Ok(Some(response.into_inner())),
+@@ -76,9 +109,9 @@ async fn fetch_transaction<P: Parameters>(
+ impl Command {
+     pub(crate) async fn run(self, wallet_dir: Option<String>) -> Result<(), anyhow::Error> {
+         let params = get_wallet_network(wallet_dir.as_ref())?;
+-        let (_, db_data) = get_db_paths(wallet_dir.as_ref());
++        let (_, db_path) = get_db_paths(wallet_dir.as_ref());
+ 
+-        let mut db_data = WalletDb::for_path(db_data, params, SystemClock, UnwrapErr(SysRng))?;
++        let mut db_data = WalletDb::for_path(&db_path, params, SystemClock, UnwrapErr(SysRng))?;
+         let chain_tip = db_data.chain_height()?.ok_or_else(|| {
+             anyhow!("Chain height must be available to perform transaction enhancement.")
+         })?;
+@@ -91,6 +124,67 @@ impl Command {
+         let mut client = self.connection.connect(params, wallet_dir.as_ref()).await?;
+ 
+         let mut satisfied_requests = BTreeSet::new();
++
++        if let Some(url) = &self.blindfetch {
++            let bf = bf_client::Blindfetch::connect(url).await?;
++            let info = bf.info();
++            println!(
++                "Blindfetch: {} transactions, heights {}..={}, {} rows, {} queries per round",
++                info.transactions, info.first_height, info.last_height, info.num_rows, info.batch
++            );
++
++            let mut wants = Vec::new();
++            let mut unlocated = Vec::new();
++            for request in db_data.transaction_data_requests()? {
++                if let TransactionDataRequest::Enhancement(txid) = &request {
++                    match mined_position(&db_path, txid)? {
++                        Some(key) => wants.push(bf_client::Want { key, txid: *txid }),
++                        None => unlocated.push(*txid),
++                    }
++                }
++            }
++
++            let (results, rounds) = bf.fetch(&params, &wants).await?;
++            let mut not_covered = unlocated;
++            for (want, fetched) in results {
++                match fetched {
++                    bf_client::Fetched::Found(tx) => {
++                        info!("Enhancing tx {:?} from Blindfetch", want.txid);
++                        decrypt_and_store_transaction(
++                            &params,
++                            &mut db_data,
++                            &tx,
++                            Some(BlockHeight::from_u32(want.key.height)),
++                        )?;
++                        satisfied_requests.insert(TransactionDataRequest::Enhancement(want.txid));
++                    }
++                    bf_client::Fetched::NotCovered => not_covered.push(want.txid),
++                }
++            }
++
++            let (up, down, ms): (usize, usize, u128) = rounds
++                .iter()
++                .fold((0, 0, 0), |a, r| (a.0 + r.bytes_up, a.1 + r.bytes_down, a.2 + r.millis));
++            println!(
++                "Fetched {} of {} transactions in {} round(s) of {} queries: {:.1} MiB up, {:.1} MiB down, {} ms",
++                wants.len() - not_covered.len().min(wants.len()),
++                wants.len(),
++                rounds.len(),
++                info.batch,
++                up as f64 / 1048576.0,
++                down as f64 / 1048576.0,
++                ms
++            );
++            println!("lightwalletd was not asked for any of them.");
++
++            if !self.allow_fallback {
++                for txid in &not_covered {
++                    println!("Not in the Blindfetch database, left for later: {txid}");
++                    satisfied_requests.insert(TransactionDataRequest::Enhancement(*txid));
++                }
++            }
++        }
++
+         loop {
+             let mut new_request_encountered = false;
+             for data_request in db_data.transaction_data_requests()? {
