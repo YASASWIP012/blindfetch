@@ -38,8 +38,8 @@ IP, a list of your payments.
 1. **Index.** `bf-indexer` walks the chain from Ironwood activation and keeps
    every transaction with a shielded output. It zeroes the proofs and
    signatures, which sit outside the txid (ZIP 244, ZIP 229), and collapses
-   the zeros. On mainnet blocks 3,529,900 to 3,530,800 that cuts 120 MB of
-   transactions to 23 MB, and every one still hashes to its txid.
+   the zeros. All of mainnet since Ironwood, 410,977 transactions, goes from
+   5.16 GB as mined to 1.09 GB, and every one still hashes to its txid.
 2. **Serve.** `bf-server` packs them into 32 KiB rows and answers YPIR queries
    over the rows. YPIR comes from `valar-ypir`, the Zellic-audited crate ZODL
    uses for private nullifier lookups in shielded voting.

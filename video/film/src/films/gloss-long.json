@@ -1,0 +1,997 @@
+{
+ "meta": {
+  "title": "Gloss \u2014 launch film (long)",
+  "fps": 30,
+  "bpm": 120,
+  "beatsPerBar": 4,
+  "tailBeats": 2,
+  "key": "D",
+  "chords": [
+   "Dmaj7",
+   "Bm7",
+   "Gmaj7",
+   "A"
+  ]
+ },
+ "brand": {
+  "bg": "#F4F2EE",
+  "surface": "#FFFFFF",
+  "ink": "#16161A",
+  "muted": "#676773",
+  "line": "#E6E3DD",
+  "accent": "#245AE6",
+  "accentInk": "#FFFFFF",
+  "dark": "#0D0E13",
+  "darkInk": "#F3F3F6",
+  "fontDisplay": "Inter",
+  "fontText": "Inter",
+  "fontMono": "Geist Mono",
+  "fontSerif": "Instrument Serif",
+  "emphasis": "accent",
+  "tracking": -0.045,
+  "weight": 750,
+  "look": "soft",
+  "aurora": [
+   "#A9C0FF",
+   "#E3C8FF",
+   "#FFD4C2",
+   "#C4DAFF",
+   "#FFFFFF"
+  ],
+  "auroraStrength": 0.42
+ },
+ "grain": 0.035,
+ "scenes": [
+  {
+   "id": "hook",
+   "type": "Journey",
+   "bars": 2,
+   "music": "sparse",
+   "props": {
+    "captions": [
+     {
+      "at": -2.2,
+      "until": 3.4,
+      "text": "Your app looks *great*."
+     },
+     {
+      "at": 4,
+      "until": 7.5,
+      "text": "Your screenshots *don't*.",
+      "pos": [
+       0.5,
+       0.2
+      ]
+     }
+    ],
+    "panels": [
+     {
+      "id": "raw",
+      "screen": "GlossApp",
+      "x": 40,
+      "y": 120,
+      "z": 0,
+      "w": 300,
+      "h": 650,
+      "lw": 393,
+      "lh": 852,
+      "radius": 6,
+      "from": 4.3,
+      "enter": "drop",
+      "rz": -4,
+      "float": 3
+     }
+    ],
+    "shots": [
+     {
+      "at": 0,
+      "zoom": 1
+     },
+     {
+      "at": 4,
+      "zoom": 1.06,
+      "y": 40,
+      "ms": 2600,
+      "ease": "sine"
+     }
+    ]
+   }
+  },
+  {
+   "id": "drop",
+   "type": "Journey",
+   "bars": 3,
+   "music": "build",
+   "events": {
+    "drag": 5,
+    "drop": 7,
+    "framed": 8
+   },
+   "props": {
+    "captions": [
+     {
+      "at": 0,
+      "until": 3,
+      "text": "Introducing *Gloss*",
+      "icon": "GlossIcon"
+     },
+     {
+      "at": 4,
+      "until": 11.5,
+      "text": "Just drop in a screenshot.",
+      "pos": [
+       0.5,
+       0.105
+      ]
+     }
+    ],
+    "panels": [
+     {
+      "id": "mock",
+      "screen": "GlossMockup",
+      "x": 0,
+      "y": 70,
+      "z": 0,
+      "w": 1000,
+      "h": 612,
+      "lw": 1200,
+      "lh": 735,
+      "radius": 34,
+      "props": {
+       "drop": true
+      },
+      "from": 3.5,
+      "enter": "rise"
+     }
+    ],
+    "shots": [
+     {
+      "at": 0,
+      "zoom": 1,
+      "y": 0
+     },
+     {
+      "at": 5.5,
+      "zoom": 1.2,
+      "y": 70,
+      "ms": 1200
+     },
+     {
+      "at": 9,
+      "zoom": 1.0,
+      "y": 40,
+      "ms": 1000
+     }
+    ]
+   },
+   "addCues": [
+    {
+     "at": "drop",
+     "sfx": "thock",
+     "gain": -2
+    },
+    {
+     "at": "framed",
+     "sfx": "shimmer",
+     "gain": -2
+    },
+    {
+     "at": "framed",
+     "sfx": "hit",
+     "gain": -6
+    }
+   ]
+  },
+  {
+   "id": "style",
+   "type": "Journey",
+   "bars": 4,
+   "music": "full",
+   "props": {
+    "captions": [
+     {
+      "at": 0,
+      "until": 5,
+      "text": "Pick from *43 devices*.",
+      "pos": [
+       0.5,
+       0.105
+      ]
+     },
+     {
+      "at": 5.6,
+      "until": 10,
+      "text": "Any backdrop. *22 to start.*",
+      "pos": [
+       0.5,
+       0.105
+      ]
+     },
+     {
+      "at": 10.5,
+      "until": 15.5,
+      "text": "Single, duo, trio \u2014 or *3D*.",
+      "pos": [
+       0.5,
+       0.105
+      ]
+     }
+    ],
+    "panels": [
+     {
+      "id": "mock",
+      "screen": "GlossMockup",
+      "x": 0,
+      "y": 70,
+      "z": 0,
+      "w": 1000,
+      "h": 612,
+      "lw": 1200,
+      "lh": 735,
+      "radius": 34,
+      "props": {
+       "steps": [
+        {
+         "at": 1,
+         "device": "pixel"
+        },
+        {
+         "at": 2,
+         "device": "ipad"
+        },
+        {
+         "at": 3,
+         "device": "macbook"
+        },
+        {
+         "at": 4,
+         "device": "iphone"
+        },
+        {
+         "at": 6.5,
+         "backdrop": 1
+        },
+        {
+         "at": 7,
+         "backdrop": 2
+        },
+        {
+         "at": 7.5,
+         "backdrop": 5
+        },
+        {
+         "at": 8,
+         "backdrop": 7
+        },
+        {
+         "at": 8.5,
+         "backdrop": 4
+        },
+        {
+         "at": 9,
+         "backdrop": 0
+        },
+        {
+         "at": 11,
+         "layout": "duo"
+        },
+        {
+         "at": 12,
+         "layout": "trio"
+        },
+        {
+         "at": 13,
+         "layout": "3d"
+        }
+       ],
+       "sheenAt": 13.5
+      }
+     }
+    ],
+    "shots": [
+     {
+      "at": 0,
+      "zoom": 1,
+      "y": 40
+     },
+     {
+      "at": 0.1,
+      "zoom": 1.07,
+      "y": 60,
+      "ms": 4400,
+      "ease": "sine"
+     },
+     {
+      "at": 10.5,
+      "zoom": 1.0,
+      "y": 50,
+      "ms": 1200
+     },
+     {
+      "at": 13,
+      "zoom": 1.1,
+      "ry": -5,
+      "ms": 1400
+     }
+    ]
+   },
+   "addCues": [
+    {
+     "at": 1,
+     "sfx": "thock"
+    },
+    {
+     "at": 2,
+     "sfx": "thock",
+     "pitch": 1
+    },
+    {
+     "at": 3,
+     "sfx": "thock",
+     "pitch": 2
+    },
+    {
+     "at": 4,
+     "sfx": "thock",
+     "pitch": 3
+    },
+    {
+     "at": 6.5,
+     "sfx": "tick",
+     "gain": -4
+    },
+    {
+     "at": 7,
+     "sfx": "tick",
+     "gain": -4,
+     "pitch": 1
+    },
+    {
+     "at": 7.5,
+     "sfx": "tick",
+     "gain": -4,
+     "pitch": 2
+    },
+    {
+     "at": 8,
+     "sfx": "tick",
+     "gain": -4,
+     "pitch": 3
+    },
+    {
+     "at": 8.5,
+     "sfx": "tick",
+     "gain": -4,
+     "pitch": 4
+    },
+    {
+     "at": 9,
+     "sfx": "tick",
+     "gain": -4,
+     "pitch": 5
+    },
+    {
+     "at": 11,
+     "sfx": "pop"
+    },
+    {
+     "at": 12,
+     "sfx": "pop",
+     "pitch": 1
+    },
+    {
+     "at": 13,
+     "sfx": "whoosh",
+     "gain": -4
+    }
+   ]
+  },
+  {
+   "id": "editor",
+   "type": "Journey",
+   "bars": 5,
+   "in": "blur",
+   "music": "full",
+   "events": {
+    "d1": 12,
+    "d2": 13,
+    "d3": 14
+   },
+   "props": {
+    "captions": [
+     {
+      "at": 0.8,
+      "until": 6,
+      "text": "All of it, *right in your browser*.",
+      "pos": [
+       0.5,
+       0.07
+      ]
+     },
+     {
+      "at": 6.4,
+      "until": 10,
+      "text": "No sign-up. *Nothing uploaded.*",
+      "pos": [
+       0.5,
+       0.07
+      ]
+     },
+     {
+      "at": 11,
+      "until": 15,
+      "text": "Swap devices in *one click*.",
+      "pos": [
+       0.5,
+       0.915
+      ]
+     },
+     {
+      "at": 15.5,
+      "until": 19.2,
+      "text": "Restyle in *a click*.",
+      "pos": [
+       0.5,
+       0.915
+      ]
+     }
+    ],
+    "panels": [
+     {
+      "id": "ed",
+      "screen": "GlossEditor",
+      "chrome": "browser",
+      "url": "gloss.dhirajkavuri.workers.dev",
+      "x": 0,
+      "y": 40,
+      "w": 1480,
+      "h": 925,
+      "float": 2,
+      "props": {
+       "mode": "devices",
+       "theme": "light",
+       "events": {
+        "trigger": "d1",
+        "react": "d2",
+        "payoff": "d3"
+       }
+      }
+     }
+    ],
+    "shots": [
+     {
+      "at": 0,
+      "zoom": 2.3,
+      "x": 20,
+      "y": 48
+     },
+     {
+      "at": 0.4,
+      "zoom": 0.95,
+      "x": 0,
+      "y": 20,
+      "ms": 1600
+     },
+     {
+      "at": 9.5,
+      "zoom": 1.55,
+      "x": -470,
+      "y": 30,
+      "ms": 1200
+     },
+     {
+      "at": 14.6,
+      "zoom": 1.55,
+      "x": 470,
+      "y": 20,
+      "ms": 1300
+     },
+     {
+      "at": 18.6,
+      "zoom": 0.95,
+      "x": 0,
+      "y": 20,
+      "ms": 1100
+     }
+    ]
+   },
+   "addCues": [
+    {
+     "at": "d1",
+     "sfx": "click"
+    },
+    {
+     "at": "d2",
+     "sfx": "click"
+    },
+    {
+     "at": "d3",
+     "sfx": "click"
+    }
+   ]
+  },
+  {
+   "id": "motion",
+   "type": "Journey",
+   "bars": 5,
+   "in": "zoom",
+   "tone": "dark",
+   "music": "break",
+   "events": {
+    "k1": 6,
+    "k2": 9,
+    "exp": 13
+   },
+   "props": {
+    "captions": [
+     {
+      "at": 0.5,
+      "until": 5,
+      "text": "Then make it *move*.",
+      "pos": [
+       0.5,
+       0.07
+      ]
+     },
+     {
+      "at": 6,
+      "until": 11.5,
+      "text": "Keyframe zoom, pan and *3D tilt*.",
+      "pos": [
+       0.5,
+       0.07
+      ]
+     },
+     {
+      "at": 13.3,
+      "until": 19.3,
+      "text": "Export *MP4 or WebM* at 60 fps.",
+      "pos": [
+       0.5,
+       0.915
+      ]
+     }
+    ],
+    "panels": [
+     {
+      "id": "ed",
+      "screen": "GlossEditor",
+      "chrome": "browser",
+      "url": "gloss.dhirajkavuri.workers.dev",
+      "x": 0,
+      "y": 40,
+      "w": 1480,
+      "h": 925,
+      "float": 2,
+      "props": {
+       "mode": "animate",
+       "theme": "dark",
+       "events": {
+        "trigger": "k1",
+        "react": "k2",
+        "payoff": "exp"
+       }
+      }
+     }
+    ],
+    "shots": [
+     {
+      "at": 0,
+      "zoom": 1.6,
+      "x": 20,
+      "y": 7
+     },
+     {
+      "at": 3,
+      "zoom": 1.15,
+      "x": 20,
+      "y": 110,
+      "ms": 1400
+     },
+     {
+      "at": 11.8,
+      "zoom": 1.7,
+      "x": 560,
+      "y": -250,
+      "ms": 1100
+     },
+     {
+      "at": 17,
+      "zoom": 0.95,
+      "x": 0,
+      "y": 20,
+      "ms": 1300
+     }
+    ]
+   },
+   "addCues": [
+    {
+     "at": "k1",
+     "sfx": "click"
+    },
+    {
+     "at": "k2",
+     "sfx": "click"
+    },
+    {
+     "at": "exp",
+     "sfx": "click"
+    },
+    {
+     "at": "exp",
+     "sfx": "chime",
+     "offset": 3
+    }
+   ]
+  },
+  {
+   "id": "templates",
+   "type": "Journey",
+   "bars": 5,
+   "in": "blur",
+   "music": "full",
+   "props": {
+    "captions": [
+     {
+      "at": 0.5,
+      "until": 4.5,
+      "text": "Start from *24 templates*.",
+      "pos": [
+       0.5,
+       0.105
+      ]
+     },
+     {
+      "at": 5,
+      "until": 11.5,
+      "text": "App Store, Product Hunt, X \u2014 *sized for each*.",
+      "pos": [
+       0.5,
+       0.105
+      ]
+     },
+     {
+      "at": 13,
+      "until": 19.3,
+      "text": "All of it, *free to start*.",
+      "pos": [
+       0.5,
+       0.105
+      ]
+     }
+    ],
+    "panels": [
+     {
+      "id": "t0",
+      "screen": "GlossTemplate",
+      "props": {
+       "variant": 0
+      },
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "w": 560,
+      "h": 385,
+      "lw": 640,
+      "lh": 440,
+      "radius": 22
+     },
+     {
+      "id": "t1",
+      "screen": "GlossTemplate",
+      "props": {
+       "variant": 1
+      },
+      "x": -720,
+      "y": -250,
+      "z": -520,
+      "w": 560,
+      "h": 385,
+      "lw": 640,
+      "lh": 440,
+      "radius": 22,
+      "from": 1.38,
+      "enter": "pop"
+     },
+     {
+      "id": "t2",
+      "screen": "GlossTemplate",
+      "props": {
+       "variant": 2
+      },
+      "x": 740,
+      "y": -230,
+      "z": -430,
+      "w": 560,
+      "h": 385,
+      "lw": 640,
+      "lh": 440,
+      "radius": 22,
+      "from": 1.56,
+      "enter": "pop"
+     },
+     {
+      "id": "t3",
+      "screen": "GlossTemplate",
+      "props": {
+       "variant": 3
+      },
+      "x": -780,
+      "y": 300,
+      "z": -380,
+      "w": 560,
+      "h": 385,
+      "lw": 640,
+      "lh": 440,
+      "radius": 22,
+      "from": 1.74,
+      "enter": "pop"
+     },
+     {
+      "id": "t4",
+      "screen": "GlossTemplate",
+      "props": {
+       "variant": 4
+      },
+      "x": 720,
+      "y": 330,
+      "z": -560,
+      "w": 560,
+      "h": 385,
+      "lw": 640,
+      "lh": 440,
+      "radius": 22,
+      "from": 1.92,
+      "enter": "pop"
+     },
+     {
+      "id": "t5",
+      "screen": "GlossTemplate",
+      "props": {
+       "variant": 5
+      },
+      "x": -160,
+      "y": -540,
+      "z": -900,
+      "w": 560,
+      "h": 385,
+      "lw": 640,
+      "lh": 440,
+      "radius": 22,
+      "from": 2.0999999999999996,
+      "enter": "pop"
+     },
+     {
+      "id": "t6",
+      "screen": "GlossTemplate",
+      "props": {
+       "variant": 6
+      },
+      "x": 280,
+      "y": 580,
+      "z": -800,
+      "w": 560,
+      "h": 385,
+      "lw": 640,
+      "lh": 440,
+      "radius": 22,
+      "from": 2.2800000000000002,
+      "enter": "pop"
+     },
+     {
+      "id": "t7",
+      "screen": "GlossTemplate",
+      "props": {
+       "variant": 7
+      },
+      "x": -1250,
+      "y": 40,
+      "z": -1050,
+      "w": 560,
+      "h": 385,
+      "lw": 640,
+      "lh": 440,
+      "radius": 22,
+      "from": 2.46,
+      "enter": "pop"
+     },
+     {
+      "id": "t8",
+      "screen": "GlossTemplate",
+      "props": {
+       "variant": 8
+      },
+      "x": 1280,
+      "y": 10,
+      "z": -980,
+      "w": 560,
+      "h": 385,
+      "lw": 640,
+      "lh": 440,
+      "radius": 22,
+      "from": 2.6399999999999997,
+      "enter": "pop"
+     },
+     {
+      "id": "t9",
+      "screen": "GlossTemplate",
+      "props": {
+       "variant": 9
+      },
+      "x": 520,
+      "y": -640,
+      "z": -1350,
+      "w": 560,
+      "h": 385,
+      "lw": 640,
+      "lh": 440,
+      "radius": 22,
+      "from": 2.82,
+      "enter": "pop"
+     }
+    ],
+    "overlays": [
+     {
+      "id": "stats",
+      "screen": "GlossStats",
+      "props": {
+       "at": 13.4
+      },
+      "x": 0,
+      "y": 300,
+      "w": 1300,
+      "h": 204,
+      "lw": 1400,
+      "lh": 220,
+      "from": 12.8,
+      "enter": "rise",
+      "radius": 26
+     }
+    ],
+    "shots": [
+     {
+      "at": 0,
+      "zoom": 2.0,
+      "x": 0,
+      "y": 0,
+      "z": 0
+     },
+     {
+      "at": 1.2,
+      "zoom": 0.62,
+      "x": 0,
+      "y": 0,
+      "z": -300,
+      "ms": 2000
+     },
+     {
+      "at": 6,
+      "zoom": 0.7,
+      "ry": -9,
+      "x": 220,
+      "z": -420,
+      "ms": 3200,
+      "ease": "sine"
+     },
+     {
+      "at": 12.4,
+      "zoom": 0.6,
+      "ry": 0,
+      "x": 0,
+      "y": -140,
+      "z": -380,
+      "ms": 1200
+     }
+    ]
+   }
+  },
+  {
+   "id": "pricing",
+   "type": "Journey",
+   "bars": 3,
+   "in": "blur",
+   "music": "build",
+   "props": {
+    "captions": [
+     {
+      "at": 0.3,
+      "until": 4.6,
+      "text": "Free forever.",
+      "pos": [
+       0.5,
+       0.1
+      ]
+     },
+     {
+      "at": 5,
+      "until": 11.5,
+      "text": "Pro is *$29, once.*",
+      "pos": [
+       0.5,
+       0.1
+      ]
+     }
+    ],
+    "panels": [
+     {
+      "id": "free",
+      "screen": "GlossPrice",
+      "props": {
+       "tier": "free",
+       "at": 1.5
+      },
+      "x": -310,
+      "y": 60,
+      "z": 0,
+      "w": 500,
+      "h": 571,
+      "lw": 560,
+      "lh": 640,
+      "from": 0.6,
+      "enter": "rise",
+      "radius": 30
+     },
+     {
+      "id": "pro",
+      "screen": "GlossPrice",
+      "props": {
+       "tier": "pro",
+       "at": 5.5
+      },
+      "x": 310,
+      "y": 60,
+      "z": 30,
+      "w": 500,
+      "h": 571,
+      "lw": 560,
+      "lh": 640,
+      "from": 1.1,
+      "enter": "rise",
+      "radius": 30,
+      "glow": true
+     }
+    ],
+    "shots": [
+     {
+      "at": 0,
+      "zoom": 0.92,
+      "y": 40
+     },
+     {
+      "at": 4.6,
+      "zoom": 1.22,
+      "x": 300,
+      "y": 70,
+      "ms": 1300
+     }
+    ]
+   }
+  },
+  {
+   "id": "outro",
+   "type": "Outro",
+   "bars": 4,
+   "in": "blur",
+   "music": "out",
+   "events": {
+    "mark": 0,
+    "line": 1,
+    "roll": 2.2,
+    "url": 4.5,
+    "click": 6
+   },
+   "props": {
+    "name": "gloss",
+    "markSvg": "<svg width=\"32\" height=\"32\" viewBox=\"0 0 32 32\"><defs><linearGradient id=\"gx-bg\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0\" stop-color=\"#5b8cff\"/><stop offset=\"1\" stop-color=\"#245ae6\"/></linearGradient><linearGradient id=\"gx-sh\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0\" stop-color=\"#fff\" stop-opacity=\"0.45\"/><stop offset=\"1\" stop-color=\"#fff\" stop-opacity=\"0\"/></linearGradient></defs><path d=\"M16 1c9.6 0 15 5.4 15 15s-5.4 15-15 15S1 25.6 1 16 6.4 1 16 1Z\" fill=\"url(#gx-bg)\"/><path d=\"M16 2.2c7.6 0 12.2 3 13.3 9.1C25 9.6 20.7 8.9 16 8.9S7 9.6 2.7 11.3C3.8 5.2 8.4 2.2 16 2.2Z\" fill=\"url(#gx-sh)\"/><rect x=\"10\" y=\"7\" width=\"12\" height=\"20\" rx=\"3.6\" fill=\"#16161a\" opacity=\"0.16\"/><rect x=\"10\" y=\"6\" width=\"12\" height=\"20\" rx=\"3.6\" fill=\"#fff\"/><rect x=\"11.6\" y=\"7.6\" width=\"8.8\" height=\"16.8\" rx=\"2.2\" fill=\"#dbe5ff\"/><path d=\"M11.6 17.4 L20.4 9.2 V12.6 L11.6 20.8 Z\" fill=\"#fff\" opacity=\"0.9\"/><path d=\"M11.6 22.2 L20.4 14 V15.2 L11.6 23.4 Z\" fill=\"#fff\" opacity=\"0.6\"/></svg>",
+    "line": "Frame your next launch for",
+    "roll": [
+     "the App Store",
+     "Product Hunt",
+     "your landing page",
+     "*everywhere.*"
+    ],
+    "url": "gloss.dhirajkavuri.workers.dev"
+   }
+  }
+ ]
+}

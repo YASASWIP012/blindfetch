@@ -37,7 +37,8 @@ start_server() {
 
 # Starts a tunnel if none is running and prints its public address.
 tunnel() {
-  local net=$1 log="$LOGS/tunnel-$net.log"
+  local net=$1
+  local log="$LOGS/tunnel-$net.log"
   if ! running "cloudflared tunnel --no-autoupdate --url http://127.0.0.1:$(port $net)"; then
     : >"$log"
     nohup cloudflared tunnel --no-autoupdate --url "http://127.0.0.1:$(port $net)" >>"$log" 2>&1 &

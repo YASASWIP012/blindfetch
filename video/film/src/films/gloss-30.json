@@ -1,0 +1,231 @@
+{
+ "meta": {
+  "title": "Gloss \u2014 launch (30s)",
+  "fps": 60,
+  "bpm": 120,
+  "beatsPerBar": 4,
+  "tailBeats": 0,
+  "chords": [
+   "Dmaj7",
+   "Bm7",
+   "Gmaj7",
+   "A"
+  ]
+ },
+ "brand": {
+  "bg": "#F4F2EE",
+  "surface": "#FFFFFF",
+  "ink": "#16161A",
+  "muted": "#676773",
+  "line": "#E6E3DD",
+  "accent": "#245AE6",
+  "accentInk": "#FFFFFF",
+  "dark": "#0D0E13",
+  "darkInk": "#F3F3F6",
+  "fontDisplay": "Inter",
+  "fontText": "Inter",
+  "fontMono": "Geist Mono",
+  "fontSerif": "Instrument Serif",
+  "emphasis": "accent",
+  "tracking": -0.045,
+  "weight": 750,
+  "look": "flat",
+  "aurora": [
+   "#A9C0FF",
+   "#E3C8FF",
+   "#FFD4C2",
+   "#C4DAFF",
+   "#FFFFFF"
+  ],
+  "auroraStrength": 0.42
+ },
+ "grain": 0.04,
+ "scenes": [
+  {
+   "id": "hook",
+   "type": "Hook",
+   "bars": 2,
+   "props": {
+    "lines": [
+     "Your screenshots",
+     "look"
+    ],
+    "swap": [
+     "flat.",
+     "boring.",
+     "*beautiful.*"
+    ]
+   }
+  },
+  {
+   "id": "reveal",
+   "type": "Reveal",
+   "bars": 1,
+   "in": "iris",
+   "props": {
+    "name": "gloss",
+    "tagline": "Device mockups, framed beautifully.",
+    "markSvg": "<svg width=\"32\" height=\"32\" viewBox=\"0 0 32 32\"><defs><linearGradient id=\"gx-bg\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0\" stop-color=\"#5b8cff\"/><stop offset=\"1\" stop-color=\"#245ae6\"/></linearGradient><linearGradient id=\"gx-sh\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0\" stop-color=\"#fff\" stop-opacity=\"0.45\"/><stop offset=\"1\" stop-color=\"#fff\" stop-opacity=\"0\"/></linearGradient></defs><path d=\"M16 1c9.6 0 15 5.4 15 15s-5.4 15-15 15S1 25.6 1 16 6.4 1 16 1Z\" fill=\"url(#gx-bg)\"/><path d=\"M16 2.2c7.6 0 12.2 3 13.3 9.1C25 9.6 20.7 8.9 16 8.9S7 9.6 2.7 11.3C3.8 5.2 8.4 2.2 16 2.2Z\" fill=\"url(#gx-sh)\"/><rect x=\"10\" y=\"7\" width=\"12\" height=\"20\" rx=\"3.6\" fill=\"#16161a\" opacity=\"0.16\"/><rect x=\"10\" y=\"6\" width=\"12\" height=\"20\" rx=\"3.6\" fill=\"#fff\"/><rect x=\"11.6\" y=\"7.6\" width=\"8.8\" height=\"16.8\" rx=\"2.2\" fill=\"#dbe5ff\"/><path d=\"M11.6 17.4 L20.4 9.2 V12.6 L11.6 20.8 Z\" fill=\"#fff\" opacity=\"0.9\"/><path d=\"M11.6 22.2 L20.4 14 V15.2 L11.6 23.4 Z\" fill=\"#fff\" opacity=\"0.6\"/></svg>"
+   }
+  },
+  {
+   "id": "drop",
+   "type": "Feature",
+   "bars": 2,
+   "in": "push",
+   "props": {
+    "num": "01",
+    "of": 3,
+    "eyebrow": "Drop",
+    "headline": [
+     "Drop in",
+     "any screenshot."
+    ],
+    "sentence": "Images or screen recordings. Nothing to install, no sign-up.",
+    "screen": "GlossEditor",
+    "screenProps": {
+     "mode": "drop"
+    },
+    "device": "browser",
+    "url": "gloss.dhirajkavuri.workers.dev",
+    "camera": [
+     {
+      "at": "react",
+      "zoom": 1.3,
+      "x": 740,
+      "y": 412
+     },
+     {
+      "at": 3.4,
+      "zoom": 1
+     }
+    ]
+   },
+   "addCues": [
+    {
+     "at": "trigger",
+     "sfx": "thock"
+    }
+   ]
+  },
+  {
+   "id": "devices",
+   "type": "Feature",
+   "bars": 2,
+   "in": "whip",
+   "props": {
+    "num": "02",
+    "of": 3,
+    "eyebrow": "Frame",
+    "headline": [
+     "Pick from",
+     "*43 devices*."
+    ],
+    "sentence": "iPhone to Pixel, iPad to MacBook \u2014 portrait or landscape.",
+    "screen": "GlossEditor",
+    "screenProps": {
+     "mode": "devices"
+    },
+    "device": "browser",
+    "url": "gloss.dhirajkavuri.workers.dev",
+    "callouts": [
+     {
+      "at": 3.2,
+      "x": 260,
+      "y": 260,
+      "label": "43 device frames",
+      "side": "top",
+      "len": 60
+     }
+    ]
+   }
+  },
+  {
+   "id": "layouts",
+   "type": "Montage",
+   "bars": 1,
+   "in": "whip",
+   "props": {
+    "items": [
+     "Single.",
+     "Duo.",
+     "Trio.",
+     "*3D.*"
+    ],
+    "step": 0.5,
+    "final": null
+   }
+  },
+  {
+   "id": "motion",
+   "type": "Feature",
+   "bars": 2,
+   "in": "zoom",
+   "tone": "dark",
+   "props": {
+    "num": "03",
+    "of": 3,
+    "eyebrow": "Motion \u00b7 Pro",
+    "headline": [
+     "Keyframe",
+     "the camera."
+    ],
+    "sentence": "Zoom, pan, rotate and 3D tilt. Export MP4 or WebM up to 60 fps.",
+    "screen": "GlossEditor",
+    "screenProps": {
+     "mode": "animate",
+     "theme": "dark"
+    },
+    "device": "browser",
+    "url": "gloss.dhirajkavuri.workers.dev"
+   }
+  },
+  {
+   "id": "private",
+   "type": "Stat",
+   "bars": 1,
+   "in": "wipe",
+   "props": {
+    "value": 0,
+    "from": 99,
+    "label": "files uploaded.",
+    "sub": "Frames, effects and encoding run in your browser."
+   }
+  },
+  {
+   "id": "templates",
+   "type": "Wall",
+   "bars": 2,
+   "in": "flood",
+   "props": {
+    "title": "*24* templates.",
+    "sub": "App Store \u00b7 Product Hunt \u00b7 Open Graph \u00b7 X \u00b7 LinkedIn",
+    "card": "GlossTemplate",
+    "cardSize": [
+     640,
+     440
+    ],
+    "count": 15,
+    "cols": 5
+   }
+  },
+  {
+   "id": "end",
+   "type": "EndCard",
+   "bars": 2,
+   "in": "iris",
+   "props": {
+    "line": "Frame your next *launch*.",
+    "product": "gloss",
+    "markSvg": "<svg width=\"32\" height=\"32\" viewBox=\"0 0 32 32\"><defs><linearGradient id=\"gx-bg\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0\" stop-color=\"#5b8cff\"/><stop offset=\"1\" stop-color=\"#245ae6\"/></linearGradient><linearGradient id=\"gx-sh\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0\" stop-color=\"#fff\" stop-opacity=\"0.45\"/><stop offset=\"1\" stop-color=\"#fff\" stop-opacity=\"0\"/></linearGradient></defs><path d=\"M16 1c9.6 0 15 5.4 15 15s-5.4 15-15 15S1 25.6 1 16 6.4 1 16 1Z\" fill=\"url(#gx-bg)\"/><path d=\"M16 2.2c7.6 0 12.2 3 13.3 9.1C25 9.6 20.7 8.9 16 8.9S7 9.6 2.7 11.3C3.8 5.2 8.4 2.2 16 2.2Z\" fill=\"url(#gx-sh)\"/><rect x=\"10\" y=\"7\" width=\"12\" height=\"20\" rx=\"3.6\" fill=\"#16161a\" opacity=\"0.16\"/><rect x=\"10\" y=\"6\" width=\"12\" height=\"20\" rx=\"3.6\" fill=\"#fff\"/><rect x=\"11.6\" y=\"7.6\" width=\"8.8\" height=\"16.8\" rx=\"2.2\" fill=\"#dbe5ff\"/><path d=\"M11.6 17.4 L20.4 9.2 V12.6 L11.6 20.8 Z\" fill=\"#fff\" opacity=\"0.9\"/><path d=\"M11.6 22.2 L20.4 14 V15.2 L11.6 23.4 Z\" fill=\"#fff\" opacity=\"0.6\"/></svg>",
+    "url": "gloss.dhirajkavuri.workers.dev",
+    "cta": "Free to start",
+    "laptopScreen": "GlossEditor",
+    "phoneScreen": "GlossApp",
+    "screenProps": {
+     "mode": "final"
+    }
+   }
+  }
+ ]
+}

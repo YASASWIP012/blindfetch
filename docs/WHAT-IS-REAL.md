@@ -9,7 +9,7 @@ demo is simulated or replayed.
 |---|---|
 | The server indexes every transaction with a shielded output since Ironwood activation (block 3,428,143) from a public lightwalletd (zec.rocks). | `GET /v1/info` on the live server gives the height range and transaction count. `bf-indexer sync` rebuilds the same database from scratch. |
 | Zeroing proofs and signatures leaves every txid unchanged. | `bf-tx::strip` recomputes the txid of every transaction it stores and skips any that changes (none have). `stats.json` counts records that could not be re-stripped. The client recomputes every txid on receipt. |
-| Stored transactions are about 5.3 times smaller than mined ones. | `stats.json` from `bf-indexer build` (on blocks 3,529,900 to 3,530,800: 120.1 MB mined, 22.8 MB stored). |
+| Stored transactions are about 5 times smaller than mined ones. | `stats.json` from `bf-indexer build`: all of Ironwood (410,977 transactions) is 5.16 GB mined and 1.09 GB stored; blocks 3,529,900 to 3,530,800 alone are 120.1 MB and 22.8 MB. |
 | PIR uses `valar-ypir` 0.2.1 from crates.io, unchanged. | `crates/bf-pir/Cargo.toml`. Its README links the Zellic audit report. |
 | A real mainnet wallet reads its memos through Blindfetch with no txid sent to lightwalletd, and ends with the same memos as the stock path. | `demo/wallet-demo.sh`. The wallet is watch-only, restored from a viewing key its owners published for audit (the Tacit project's mainnet lot 2 vault). |
 | The browser demo fetches any indexed mainnet transaction over PIR. | blindfetch.vercel.app. Paste the transaction's txid from any explorer into the "expected txid" field to have the page check it. |

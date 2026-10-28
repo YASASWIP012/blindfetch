@@ -11,6 +11,7 @@ signatures) and collapsing the zeros:
 
 | Mainnet blocks | Transactions | Mined size | Stored size | Ratio |
 |---|---|---|---|---|
+| 3,428,143 to 3,533,687 (all of Ironwood) | 410,977 | 5.16 GB | 1.09 GB | 4.7× |
 | 3,529,900 to 3,530,800 | 12,969 | 120.1 MB | 22.8 MB | 5.3× |
 | 3,532,500 to 3,533,662 | 4,442 | 42.2 MB | 9.6 MB (proofs only) | 4.4× |
 
@@ -18,8 +19,14 @@ Every stored transaction was checked against its txid when it was stored, and
 every transaction fetched by a client is checked again.
 
 The index costs about 3.5 bytes per transaction plus 16 bytes per row of
-hashes. For the full Ironwood history (roughly 400,000 transactions in about
-1 GiB of rows) that is about 2 MB, downloaded once per database version.
+hashes. For the full Ironwood history (410,977 transactions, 65,536 rows) it is
+2.4 MB, downloaded once per database version. No stored transaction failed its
+txid check on re-stripping.
+
+The stored stream is 1.09 GB, just over 1 GiB, so YPIR pads the database to
+65,536 rows (2 GiB). The largest transaction is 454 KB, more than one round of
+four 32 KiB rows can carry; a wallet that needs it waits until a tick with
+more rounds.
 
 ## Server cost per query
 

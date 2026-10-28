@@ -1,0 +1,289 @@
+{
+ "meta": {
+  "title": "Blindfetch",
+  "fps": 30,
+  "bpm": 120,
+  "beatsPerBar": 4,
+  "tailBeats": 2,
+  "chords": [
+   "Dm7",
+   "Bbmaj7",
+   "Fmaj7",
+   "C"
+  ],
+  "target": 108
+ },
+ "brand": {
+  "bg": "#F5F5F7",
+  "surface": "#FFFFFF",
+  "ink": "#1D1D1F",
+  "muted": "#6E6E73",
+  "line": "#E5E5EA",
+  "accent": "#1D1D1F",
+  "accentInk": "#FFFFFF",
+  "dark": "#0E0F12",
+  "darkInk": "#F2F0EB",
+  "fontDisplay": "Inter",
+  "fontText": "Inter",
+  "fontMono": "Geist Mono",
+  "fontSerif": "Instrument Serif",
+  "emphasis": "serif",
+  "tracking": -0.042,
+  "weight": 720,
+  "look": "soft",
+  "aurora": [
+   "#DCE8FF",
+   "#FFE6C2",
+   "#F5F5F7",
+   "#E9EEF7",
+   "#FFFFFF"
+  ],
+  "auroraStrength": 0.32,
+  "panel": "#FFFFFF",
+  "panelBorder": "rgba(0,0,0,0.06)"
+ },
+ "grain": 0.03,
+ "scenes": [
+  {
+   "id": "hook",
+   "type": "Hook",
+   "bars": 2,
+   "music": "sparse",
+   "props": {
+    "lines": [
+     "A shielded payment",
+     "hides *who paid you*."
+    ],
+    "size": 112,
+    "align": "left"
+   }
+  },
+  {
+   "id": "leak",
+   "type": "Feature",
+   "bars": 7,
+   "in": "push",
+   "music": "build",
+   "events": {
+    "trigger": 2,
+    "react": 7,
+    "payoff": 17
+   },
+   "props": {
+    "num": "",
+    "of": 0,
+    "eyebrow": "The leak",
+    "headline": [
+     "One request",
+     "*per payment*."
+    ],
+    "sentence": "zcash-devtool asks lightwalletd for each transaction by txid.",
+    "screen": "BfTerminal",
+    "screenProps": {
+     "mode": "stock"
+    },
+    "device": "laptop",
+    "side": "right"
+   },
+   "addCues": [
+    {
+     "at": 7.0,
+     "sfx": "tick"
+    },
+    {
+     "at": 8.24,
+     "sfx": "tick",
+     "pitch": 2
+    },
+    {
+     "at": 9.48,
+     "sfx": "tick",
+     "pitch": 4
+    }
+   ]
+  },
+  {
+   "id": "reveal",
+   "type": "Reveal",
+   "bars": 3,
+   "in": "iris",
+   "music": "build",
+   "props": {
+    "name": "Blindfetch",
+    "tagline": "Read your memos. The server never learns which.",
+    "markSvg": "<svg width=\"32\" height=\"32\" viewBox=\"0 0 28 28\"><rect width=\"28\" height=\"28\" rx=\"6.3\" fill=\"#1D1D1F\"/><path d=\"M6.5 14c2-3.4 4.6-5.1 7.5-5.1s5.5 1.7 7.5 5.1c-2 3.4-4.6 5.1-7.5 5.1S8.5 17.4 6.5 14z\" fill=\"none\" stroke=\"#fff\" stroke-width=\"1.6\"/><circle cx=\"14\" cy=\"14\" r=\"2.3\" fill=\"#fff\"/><path d=\"M7 21L21 7\" stroke=\"#1D1D1F\" stroke-width=\"3.4\"/><path d=\"M7.4 20.6L20.6 7.4\" stroke=\"#fff\" stroke-width=\"1.6\" stroke-linecap=\"round\"/></svg>"
+   }
+  },
+  {
+   "id": "index",
+   "type": "Feature",
+   "bars": 9,
+   "in": "push",
+   "music": "full",
+   "events": {
+    "trigger": 3,
+    "react": 12,
+    "payoff": 26
+   },
+   "props": {
+    "num": "01",
+    "of": 3,
+    "eyebrow": "Index",
+    "headline": [
+     "Same txid.",
+     "*5.3\u00d7 smaller*."
+    ],
+    "sentence": "Proofs and signatures sit outside the txid, so they become zeros.",
+    "screen": "BfIndex",
+    "device": "laptop",
+    "side": "left"
+   },
+   "addCues": [
+    {
+     "at": 12,
+     "sfx": "count",
+     "beats": 3
+    }
+   ]
+  },
+  {
+   "id": "fetch",
+   "type": "Feature",
+   "bars": 6,
+   "in": "whip",
+   "music": "full",
+   "events": {
+    "trigger": 2,
+    "react": 8,
+    "payoff": 15
+   },
+   "props": {
+    "num": "02",
+    "of": 3,
+    "eyebrow": "Fetch",
+    "headline": [
+     "Four queries.",
+     "*Any* row."
+    ],
+    "sentence": "YPIR hides which row each query asks for. Dummies fill the rest.",
+    "screen": "BfRows",
+    "device": "laptop",
+    "side": "right"
+   }
+  },
+  {
+   "id": "wallet",
+   "type": "Feature",
+   "bars": 7,
+   "in": "whip",
+   "music": "full",
+   "events": {
+    "trigger": 2,
+    "react": 4,
+    "payoff": 14
+   },
+   "props": {
+    "num": "03",
+    "of": 3,
+    "eyebrow": "Verify",
+    "headline": [
+     "Same memos.",
+     "*Zero* txids sent."
+    ],
+    "sentence": "Every answer is checked, and every txid recomputed.",
+    "screen": "BfTerminal",
+    "screenProps": {
+     "mode": "blindfetch"
+    },
+    "device": "laptop",
+    "side": "left"
+   }
+  },
+  {
+   "id": "browser",
+   "type": "Feature",
+   "bars": 7,
+   "in": "push",
+   "music": "full",
+   "events": {
+    "trigger": 6,
+    "react": 9,
+    "payoff": 14
+   },
+   "props": {
+    "num": "",
+    "of": 0,
+    "eyebrow": "Try it",
+    "headline": [
+     "Live, in",
+     "*your browser*."
+    ],
+    "sentence": "The page builds the queries. The server logs four of them.",
+    "screen": "BfPage",
+    "device": "browser",
+    "url": "blindfetch.vercel.app",
+    "side": "right"
+   }
+  },
+  {
+   "id": "ticks",
+   "type": "Feature",
+   "bars": 6,
+   "in": "zoom",
+   "tone": "dark",
+   "music": "break",
+   "events": {
+    "trigger": 2,
+    "react": 8,
+    "payoff": 15
+   },
+   "props": {
+    "num": "",
+    "of": 0,
+    "eyebrow": "Schedule",
+    "headline": [
+     "Three payments",
+     "or *none*."
+    ],
+    "sentence": "Every tick sends the same traffic. A lying server is locked out.",
+    "screen": "BfTicks",
+    "device": "laptop",
+    "side": "left"
+   }
+  },
+  {
+   "id": "zero",
+   "type": "Stat",
+   "bars": 2,
+   "in": "wipe",
+   "music": "full",
+   "props": {
+    "value": 0,
+    "from": 3,
+    "label": "txids sent to lightwalletd.",
+    "sub": "A mainnet wallet reading three memos.",
+    "decimals": 0
+   }
+  },
+  {
+   "id": "outro",
+   "type": "Outro",
+   "bars": 4,
+   "in": "blur",
+   "music": "out",
+   "props": {
+    "name": "Blindfetch",
+    "markSvg": "<svg width=\"32\" height=\"32\" viewBox=\"0 0 28 28\"><rect width=\"28\" height=\"28\" rx=\"6.3\" fill=\"#1D1D1F\"/><path d=\"M6.5 14c2-3.4 4.6-5.1 7.5-5.1s5.5 1.7 7.5 5.1c-2 3.4-4.6 5.1-7.5 5.1S8.5 17.4 6.5 14z\" fill=\"none\" stroke=\"#fff\" stroke-width=\"1.6\"/><circle cx=\"14\" cy=\"14\" r=\"2.3\" fill=\"#fff\"/><path d=\"M7 21L21 7\" stroke=\"#1D1D1F\" stroke-width=\"3.4\"/><path d=\"M7.4 20.6L20.6 7.4\" stroke=\"#fff\" stroke-width=\"1.6\" stroke-linecap=\"round\"/></svg>",
+    "line": "Read your memos",
+    "roll": [
+     "in zcash-devtool",
+     "in a browser",
+     "*privately.*"
+    ],
+    "url": "blindfetch.vercel.app",
+    "cta": "",
+    "look": "soft"
+   }
+  }
+ ]
+}

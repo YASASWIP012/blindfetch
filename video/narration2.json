@@ -1,0 +1,11 @@
+{
+  "hook": "A shielded Zcash payment hides who paid you.",
+  "leak": "To read its memo, a light wallet asks its server for that transaction by its ID. Here zcash-devtool reads a real mainnet wallet's memos, and the server gets three requests that name three of its payments.",
+  "reveal": "Blindfetch answers the same request with private information retrieval.",
+  "index": "It keeps every transaction with a shielded output since Ironwood went live. Proofs and signatures sit outside the transaction ID, so it turns them into zeros. A hundred and twenty megabytes become about twenty-three, and every transaction still hashes to its ID.",
+  "fetch": "It serves thirty-two kilobyte rows over YPIR, the scheme ZODL uses for shielded voting. Every fetch is four encrypted queries, with dummies shuffled in.",
+  "wallet": "Same wallet, same three transactions, read through Blindfetch. It checks every answer and recomputes each transaction ID. The memos match, and lightwalletd is never asked.",
+  "browser": "You can try it in a browser. Pick any mainnet transaction, and the page builds the queries itself. The server's own log shows four queries of the same size, and nothing about which one you picked.",
+  "ticks": "Wallets fetch on a fixed schedule, so a tick that brought three payments sends the same traffic as a tick that brought none. A server that sends anything wrong is caught and locked out.",
+  "outro": "Blindfetch is open source, runs on mainnet today, and plugs into the hook every librustzcash wallet already has."
+}
