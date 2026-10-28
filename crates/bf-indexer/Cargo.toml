@@ -14,7 +14,7 @@ anyhow.workspace = true
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 bf-client = { path = "../bf-client" }
 bf-core = { path = "../bf-core" }
-bf-tx = { path = "../bf-tx" }
+bf-tx = { path = "../bf-tx", features = ["strip"] }
 clap = { version = "4.5", features = ["derive"] }
 futures-util = "0.3"
 hex.workspace = true

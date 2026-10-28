@@ -16,8 +16,11 @@
 //! ordinary transaction encoding that any parser reads. It must never be
 //! broadcast: with zeroed proofs it is not valid on chain.
 
+#[cfg(feature = "strip")]
 use orchard::{bundle::Authorized as BundleAuthorized, circuit::Proof};
-use zcash_primitives::transaction::{Authorized, Transaction, TxId, TxVersion};
+#[cfg(feature = "strip")]
+use zcash_primitives::transaction::{Authorized, TxVersion};
+use zcash_primitives::transaction::{Transaction, TxId};
 use zcash_protocol::consensus::BranchId;
 
 /// Undoes the zero-run compression.
@@ -40,6 +43,7 @@ pub enum Error {
 pub const MAX_TX_BYTES: usize = 2_000_000;
 
 /// A transaction with its Orchard and Ironwood proofs zeroed and compressed.
+#[cfg(feature = "strip")]
 #[derive(Clone, Debug)]
 pub struct Stripped {
     pub txid: TxId,
@@ -53,6 +57,7 @@ pub struct Stripped {
 /// `branch` is only consulted for v4 transactions, whose encoding does not
 /// carry a branch ID; v4 transactions have no Orchard or Ironwood bundle and
 /// come back unchanged.
+#[cfg(feature = "strip")]
 pub fn strip(raw: &[u8], branch: BranchId) -> Result<Stripped, Error> {
     let tx = Transaction::read(raw, branch)?;
     let txid = tx.txid();

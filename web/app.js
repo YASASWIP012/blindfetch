@@ -10,6 +10,7 @@ const $ = (id) => document.getElementById(id);
 let net = 'main';
 let session = null;
 let seenTimer = null;
+let batch = 4;
 
 const fmtBytes = (n) => n >= 1048576 ? `${(n / 1048576).toFixed(1)} MiB` : n >= 1024 ? `${(n / 1024).toFixed(0)} KiB` : `${n} B`;
 const fmtNum = (n) => n.toLocaleString('en-US');
@@ -26,6 +27,7 @@ async function connect() {
     const info = await (await fetch(`${base()}/v1/info`)).json();
     const indexBuf = new Uint8Array(await (await fetch(`${base()}/v1/index`)).arrayBuffer());
     session = new Session(JSON.stringify(info), indexBuf);
+    batch = info.batch;
     const ms = Math.round(performance.now() - t0);
     $('status').textContent = `Index downloaded in ${ms} ms. Every visitor downloads all of it, so this told the server nothing.`;
     $('stats').innerHTML = [
@@ -61,7 +63,7 @@ async function fetchPrivately() {
   $('go').disabled = true;
   const out = $('result');
   out.hidden = false;
-  out.innerHTML = '<p class="muted">Building eight queries in your browser…</p>';
+  out.innerHTML = `<p class="muted">Building ${batch} queries in your browser…</p>`;
   try {
     const t0 = performance.now();
     const body = session.buildRound(h, i);
@@ -83,7 +85,7 @@ async function fetchPrivately() {
       : tx.matches_expected ? '<span class="ok">Matches the txid you gave.</span>' : '<span class="bad">Does not match the txid you gave.</span>';
     out.innerHTML = `
       <dl class="stats">
-        <div><dt>Sent</dt><dd>8 queries, ${fmtBytes(body.length)}</dd></div>
+        <div><dt>Sent</dt><dd>${batch} queries, ${fmtBytes(body.length)}</dd></div>
         <div><dt>Received</dt><dd>${fmtBytes(answer.length)}</dd></div>
         <div><dt>Queries built</dt><dd>${Math.round(t1 - t0)} ms</dd></div>
         <div><dt>Round trip</dt><dd>${Math.round(t2 - t1)} ms</dd></div>
@@ -108,9 +110,9 @@ async function pollSeen(once) {
   try {
     const rows = await (await fetch(`${base()}/v1/seen`)).json();
     const lines = rows.slice(0, 12).map((r) => {
-      const t = new Date(r.at * 1000).toISOString().slice(11, 19);
+      const t = new Date(r.at * 1000).toISOString().slice(11, 16);
       return r.kind === 'query'
-        ? `${t}  POST /v1/query  ${r.queries} queries  in ${fmtBytes(r.bytes_in)}  out ${fmtBytes(r.bytes_out)}  ${r.millis} ms`
+        ? `${t}  POST /v1/query  ${r.queries} queries  in ${fmtBytes(r.bytes_in)}  out ${fmtBytes(r.bytes_out)}`
         : `${t}  GET  /v1/index  out ${fmtBytes(r.bytes_out)}`;
     });
     $('seen').textContent = lines.length ? lines.join('\n') : 'No requests yet.';
