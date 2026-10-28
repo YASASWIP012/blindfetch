@@ -12,7 +12,7 @@ index 3aa6c5e..69bc22e 100644
  bip32 = { version = "0.6", default-features = false, features = ["secp256k1-ffi"] }
  futures-util = "0.3"
 diff --git a/src/commands/wallet/enhance.rs b/src/commands/wallet/enhance.rs
-index 137443a..ded31f1 100644
+index 137443a..dfb75d2 100644
 --- a/src/commands/wallet/enhance.rs
 +++ b/src/commands/wallet/enhance.rs
 @@ -1,6 +1,7 @@
@@ -23,7 +23,7 @@ index 137443a..ded31f1 100644
  use clap::Args;
  use futures_util::StreamExt;
  use rand::{rand_core::UnwrapErr, rngs::SysRng};
-@@ -27,6 +28,36 @@ use crate::{config::get_wallet_network, data::get_db_paths, remote::ConnectionAr
+@@ -27,6 +28,61 @@ use crate::{config::get_wallet_network, data::get_db_paths, remote::ConnectionAr
  pub(crate) struct Command {
      #[command(flatten)]
      connection: ConnectionArgs,
@@ -37,6 +37,31 @@ index 137443a..ded31f1 100644
 +    /// cover from lightwalletd by txid. This reveals those txids.
 +    #[arg(long, requires = "blindfetch")]
 +    allow_fallback: bool,
++
++    /// With --blindfetch, keep running and fetch on a fixed schedule: every
++    /// this many seconds, exactly --rounds rounds, whether or not anything
++    /// arrived. The server then cannot tell when payments land.
++    #[arg(long, requires = "blindfetch")]
++    every: Option<u64>,
++
++    /// Rounds per tick with --every.
++    #[arg(long, default_value_t = 2, requires = "every")]
++    rounds: usize,
++}
++
++/// One fetch: on a fixed schedule exactly `rounds` rounds, otherwise as many
++/// as the wanted transactions need.
++async fn blindfetch_once<P: Parameters>(
++    bf: &bf_client::Blindfetch,
++    params: &P,
++    wants: &[bf_client::Want],
++    every: Option<u64>,
++    rounds: usize,
++) -> anyhow::Result<(Vec<(bf_client::Want, bf_client::Fetched)>, Vec<bf_client::RoundStats>)> {
++    match every {
++        Some(_) => bf.fetch_tick(params, wants, rounds).await,
++        None => bf.fetch(params, wants).await,
++    }
 +}
 +
 +/// Where the wallet saw a transaction mined, which is all a Blindfetch server
@@ -60,7 +85,7 @@ index 137443a..ded31f1 100644
  }
  
  fn parse_raw_transaction<P: Parameters>(
-@@ -56,6 +87,8 @@ async fn fetch_transaction<P: Parameters>(
+@@ -56,6 +112,8 @@ async fn fetch_transaction<P: Parameters>(
          hash: txid.as_ref().to_vec(),
          ..Default::default()
      };
@@ -69,7 +94,7 @@ index 137443a..ded31f1 100644
  
      let raw_tx = match client.get_transaction(request).await {
          Ok(response) => Ok(Some(response.into_inner())),
-@@ -76,9 +109,9 @@ async fn fetch_transaction<P: Parameters>(
+@@ -76,9 +134,9 @@ async fn fetch_transaction<P: Parameters>(
  impl Command {
      pub(crate) async fn run(self, wallet_dir: Option<String>) -> Result<(), anyhow::Error> {
          let params = get_wallet_network(wallet_dir.as_ref())?;
@@ -81,67 +106,108 @@ index 137443a..ded31f1 100644
          let chain_tip = db_data.chain_height()?.ok_or_else(|| {
              anyhow!("Chain height must be available to perform transaction enhancement.")
          })?;
-@@ -91,6 +124,67 @@ impl Command {
+@@ -91,6 +149,108 @@ impl Command {
          let mut client = self.connection.connect(params, wallet_dir.as_ref()).await?;
  
          let mut satisfied_requests = BTreeSet::new();
 +
++        let strict = self.blindfetch.is_some() && !self.allow_fallback;
 +        if let Some(url) = &self.blindfetch {
-+            let bf = bf_client::Blindfetch::connect(url).await?;
-+            let info = bf.info();
++            // A server that once failed a check is never used again from this
++            // wallet. Retrying would let it probe which queries were real.
++            let lock = db_path.with_file_name("blindfetch-untrusted");
++            if std::fs::read_to_string(&lock).is_ok_and(|s| s.lines().any(|l| l == url.as_str())) {
++                anyhow::bail!("{url} failed a Blindfetch check earlier and is locked out (see {})", lock.display());
++            }
++            let mut bf = bf_client::Blindfetch::connect(url).await?;
++            let info = bf.info().clone();
 +            println!(
 +                "Blindfetch: {} transactions, heights {}..={}, {} rows, {} queries per round",
 +                info.transactions, info.first_height, info.last_height, info.num_rows, info.batch
 +            );
 +
-+            let mut wants = Vec::new();
-+            let mut unlocated = Vec::new();
-+            for request in db_data.transaction_data_requests()? {
-+                if let TransactionDataRequest::Enhancement(txid) = &request {
-+                    match mined_position(&db_path, txid)? {
-+                        Some(key) => wants.push(bf_client::Want { key, txid: *txid }),
-+                        None => unlocated.push(*txid),
++            loop {
++                let mut wants = Vec::new();
++                let mut unlocated = Vec::new();
++                for request in db_data.transaction_data_requests()? {
++                    if let TransactionDataRequest::Enhancement(txid) = &request {
++                        if satisfied_requests.contains(&request) {
++                            continue;
++                        }
++                        match mined_position(&db_path, txid)? {
++                            Some(key) => wants.push(bf_client::Want { key, txid: *txid }),
++                            None => unlocated.push(*txid),
++                        }
 +                    }
 +                }
-+            }
 +
-+            let (results, rounds) = bf.fetch(&params, &wants).await?;
-+            let mut not_covered = unlocated;
-+            for (want, fetched) in results {
-+                match fetched {
-+                    bf_client::Fetched::Found(tx) => {
-+                        info!("Enhancing tx {:?} from Blindfetch", want.txid);
-+                        decrypt_and_store_transaction(
-+                            &params,
-+                            &mut db_data,
-+                            &tx,
-+                            Some(BlockHeight::from_u32(want.key.height)),
-+                        )?;
-+                        satisfied_requests.insert(TransactionDataRequest::Enhancement(want.txid));
++                // A rebuilt database is the one failure worth retrying, once.
++                // Any other failure means the server misbehaved: lock it out.
++                let outcome = match blindfetch_once(&bf, &params, &wants, self.every, self.rounds).await {
++                    Err(e) if e.to_string().contains("rebuilt its database") => {
++                        bf = bf_client::Blindfetch::connect(url).await?;
++                        blindfetch_once(&bf, &params, &wants, self.every, self.rounds).await
 +                    }
-+                    bf_client::Fetched::NotCovered => not_covered.push(want.txid),
++                    other => other,
++                };
++                let (results, rounds) = match outcome {
++                    Ok(r) => r,
++                    Err(e) if e.to_string().contains(bf_client::UNTRUSTED) => {
++                        use std::io::Write as _;
++                        let mut f = std::fs::OpenOptions::new().create(true).append(true).open(&lock)?;
++                        writeln!(f, "{url}")?;
++                        return Err(e);
++                    }
++                    Err(e) => return Err(e),
++                };
++
++                let mut not_covered = unlocated;
++                let mut fetched = 0;
++                let mut waiting = 0;
++                for (want, result) in results {
++                    match result {
++                        bf_client::Fetched::Found(tx) => {
++                            info!("Enhancing tx {:?} from Blindfetch", want.txid);
++                            decrypt_and_store_transaction(
++                                &params,
++                                &mut db_data,
++                                &tx,
++                                Some(BlockHeight::from_u32(want.key.height)),
++                            )?;
++                            satisfied_requests.insert(TransactionDataRequest::Enhancement(want.txid));
++                            fetched += 1;
++                        }
++                        bf_client::Fetched::NotCovered => not_covered.push(want.txid),
++                        bf_client::Fetched::Deferred => waiting += 1,
++                    }
 +                }
-+            }
 +
-+            let (up, down, ms): (usize, usize, u128) = rounds
-+                .iter()
-+                .fold((0, 0, 0), |a, r| (a.0 + r.bytes_up, a.1 + r.bytes_down, a.2 + r.millis));
-+            println!(
-+                "Fetched {} of {} transactions in {} round(s) of {} queries: {:.1} MiB up, {:.1} MiB down, {} ms",
-+                wants.len() - not_covered.len().min(wants.len()),
-+                wants.len(),
-+                rounds.len(),
-+                info.batch,
-+                up as f64 / 1048576.0,
-+                down as f64 / 1048576.0,
-+                ms
-+            );
-+            println!("lightwalletd was not asked for any of them.");
++                let (up, down, ms): (usize, usize, u128) = rounds
++                    .iter()
++                    .fold((0, 0, 0), |a, r| (a.0 + r.bytes_up, a.1 + r.bytes_down, a.2 + r.millis));
++                println!(
++                    "Fetched {fetched} of {} transactions in {} round(s) of {} queries: {:.1} MiB up, {:.1} MiB down, {ms} ms",
++                    wants.len(),
++                    rounds.len(),
++                    info.batch,
++                    up as f64 / 1048576.0,
++                    down as f64 / 1048576.0,
++                );
++                if waiting > 0 {
++                    println!("{waiting} more wait for the next tick.");
++                }
++                println!("lightwalletd was not asked for any of them.");
 +
-+            if !self.allow_fallback {
-+                for txid in &not_covered {
-+                    println!("Not in the Blindfetch database, left for later: {txid}");
-+                    satisfied_requests.insert(TransactionDataRequest::Enhancement(*txid));
++                if !self.allow_fallback {
++                    for txid in &not_covered {
++                        println!("Not in the Blindfetch database, left for later: {txid}");
++                        satisfied_requests.insert(TransactionDataRequest::Enhancement(*txid));
++                    }
++                }
++
++                match self.every {
++                    Some(secs) => tokio::time::sleep(std::time::Duration::from_secs(secs)).await,
++                    None => break,
 +                }
 +            }
 +        }
@@ -149,3 +215,14 @@ index 137443a..ded31f1 100644
          loop {
              let mut new_request_encountered = false;
              for data_request in db_data.transaction_data_requests()? {
+@@ -114,6 +274,10 @@ impl Command {
+                         info!("Got status {:?}", status);
+                         db_data.set_transaction_status(*txid, status)?;
+                     }
++                    TransactionDataRequest::Enhancement(txid) if strict => {
++                        // Asking lightwalletd would name the transaction.
++                        println!("Deferred, not asking lightwalletd: {txid}");
++                    }
+                     TransactionDataRequest::Enhancement(txid) => {
+                         match fetch_transaction(&mut client, &params, chain_tip, *txid).await? {
+                             None => {
