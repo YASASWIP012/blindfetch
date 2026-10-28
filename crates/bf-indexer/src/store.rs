@@ -46,6 +46,26 @@ impl Store {
         self.next_height
     }
 
+    /// Hash of the last block committed, if known, for checking that the next
+    /// chunk extends the same chain.
+    pub fn last_hash(&self) -> Option<Vec<u8>> {
+        std::fs::read(self.dir.join("last_hash")).ok().filter(|h| h.len() == 32)
+    }
+
+    pub fn set_last_hash(&self, hash: &[u8]) -> anyhow::Result<()> {
+        fs::write(self.dir.join("last_hash"), hash)?;
+        Ok(())
+    }
+
+    /// Forgets everything from `height` on, after a reorg.
+    pub fn rewind(&mut self, height: u32) -> anyhow::Result<()> {
+        let height = height.min(self.next_height);
+        fs::write(self.dir.join("progress"), height.to_string())?;
+        let _ = fs::remove_file(self.dir.join("last_hash"));
+        self.next_height = height;
+        self.truncate_unfinished()
+    }
+
     fn log_path(&self) -> PathBuf {
         self.dir.join("txs.bin")
     }

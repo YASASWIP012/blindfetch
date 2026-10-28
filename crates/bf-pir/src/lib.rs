@@ -8,10 +8,9 @@
 //! `u64 LE len(q) | q as u64 LE words | public params as u64 LE words`.
 
 use anyhow::ensure;
-use ypir::{
-    client::YPIRClient,
-    params::{YPIRSPConfig, params_for_scenario_simplepir_with_config},
-};
+use ypir::{client::YPIRClient, params::YPIRSPConfig};
+#[cfg(feature = "server")]
+use ypir::params::params_for_scenario_simplepir_with_config;
 #[cfg(feature = "server")]
 use ypir::params::{DbRowsCols, PtModulusBits};
 
@@ -104,7 +103,7 @@ pub use server::Server;
 #[cfg(feature = "server")]
 mod server {
     use super::*;
-    use std::io::Cursor;
+    use std::{io::Cursor, mem::ManuallyDrop};
     use ypir::{
         serialize::{FilePtIter, OfflinePrecomputedValues},
         server::YServer,
@@ -114,19 +113,29 @@ mod server {
     /// queries.
     ///
     /// YPIR's server borrows its parameters and data for its whole life, so
-    /// both are leaked into `'static` here. A server process holds one or two
-    /// databases at a time and swaps them every few minutes at most; the
-    /// leak is reclaimed by replacing the process, which the deployment does
-    /// on each nightly full rebuild.
+    /// both are boxed here and freed only after the server that borrows them.
     pub struct Server {
         scenario: Scenario,
-        server: YServer<'static, u16>,
-        offline: OfflinePrecomputedValues<'static>,
+        server: ManuallyDrop<YServer<'static, u16>>,
+        offline: ManuallyDrop<OfflinePrecomputedValues<'static>>,
+        params: *mut spiral_rs::params::Params,
+        data: *mut [u8],
     }
 
-    // YServer holds raw pointers into leaked, never-mutated memory.
+    // The raw pointers are owned boxes that nothing mutates after construction.
     unsafe impl Send for Server {}
     unsafe impl Sync for Server {}
+
+    impl Drop for Server {
+        fn drop(&mut self) {
+            unsafe {
+                ManuallyDrop::drop(&mut self.server);
+                ManuallyDrop::drop(&mut self.offline);
+                drop(Box::from_raw(self.params));
+                drop(Box::from_raw(self.data));
+            }
+        }
+    }
 
     impl Server {
         pub fn new(rows: Vec<u8>, scenario: Scenario) -> anyhow::Result<Self> {
@@ -136,8 +145,12 @@ mod server {
                 rows.len(),
                 scenario.num_items * scenario.row_bytes()
             );
-            let params: &'static spiral_rs::params::Params = Box::leak(Box::new(scenario.params()));
-            let data: &'static [u8] = Box::leak(rows.into_boxed_slice());
+            let params_ptr = Box::into_raw(Box::new(scenario.params()));
+            let data_ptr = Box::into_raw(rows.into_boxed_slice());
+            // SAFETY: both boxes outlive `server` and `offline`, which Drop
+            // releases first.
+            let params: &'static spiral_rs::params::Params = unsafe { &*params_ptr };
+            let data: &'static [u8] = unsafe { &*data_ptr };
             let iter = FilePtIter::new(
                 Cursor::new(data),
                 scenario.row_bytes(),
@@ -146,7 +159,13 @@ mod server {
             );
             let server = YServer::<u16>::new(params, iter, true, false, true);
             let offline = server.perform_offline_precomputation_simplepir(None, None, None);
-            Ok(Server { scenario, server, offline })
+            Ok(Server {
+                scenario,
+                server: ManuallyDrop::new(server),
+                offline: ManuallyDrop::new(offline),
+                params: params_ptr,
+                data: data_ptr,
+            })
         }
 
         pub fn scenario(&self) -> Scenario {

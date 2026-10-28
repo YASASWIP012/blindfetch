@@ -56,13 +56,13 @@ struct Db {
 
 #[derive(Clone, Serialize)]
 struct Seen {
-    /// Unix seconds.
+    /// Unix time rounded down to the minute. Finer timing would help anyone
+    /// reading this log match requests to wallets.
     at: u64,
     kind: &'static str,
     bytes_in: usize,
     bytes_out: usize,
     queries: usize,
-    millis: u64,
     db_version: u32,
 }
 
@@ -113,8 +113,9 @@ fn load(dir: &Path, batch: usize) -> anyhow::Result<Db> {
     Ok(Db { info, index: Bytes::from(index_bytes), pir })
 }
 
-fn now_secs() -> u64 {
-    SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).map_or(0, |d| d.as_secs())
+fn now_minute() -> u64 {
+    let secs = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).map_or(0, |d| d.as_secs());
+    secs - secs % 60
 }
 
 async fn info(State(app): State<Arc<AppState>>) -> Json<wire::Info> {
@@ -124,12 +125,11 @@ async fn info(State(app): State<Arc<AppState>>) -> Json<wire::Info> {
 async fn index(State(app): State<Arc<AppState>>) -> Response {
     let db = app.current();
     app.record(Seen {
-        at: now_secs(),
+        at: now_minute(),
         kind: "index",
         bytes_in: 0,
         bytes_out: db.index.len(),
         queries: 0,
-        millis: 0,
         db_version: db.info.last_height,
     });
     (
@@ -143,7 +143,6 @@ async fn index(State(app): State<Arc<AppState>>) -> Response {
 }
 
 async fn query(State(app): State<Arc<AppState>>, headers: HeaderMap, body: Bytes) -> Response {
-    let started = Instant::now();
     let db = app.current();
     let version = headers
         .get("x-db-version")
@@ -181,12 +180,11 @@ async fn query(State(app): State<Arc<AppState>>, headers: HeaderMap, body: Bytes
     };
     let out = wire::encode_parts(&answers);
     app.record(Seen {
-        at: now_secs(),
+        at: now_minute(),
         kind: "query",
         bytes_in: body.len(),
         bytes_out: out.len(),
         queries: app.batch,
-        millis: started.elapsed().as_millis() as u64,
         db_version: db.info.last_height,
     });
     ([(header::CONTENT_TYPE, "application/octet-stream")], out).into_response()
@@ -236,14 +234,15 @@ async fn main() -> anyhow::Result<()> {
     });
     spawn_reloader(app.clone(), cli.data.clone(), Duration::from_secs(cli.reload_secs));
 
+    // Only the index is compressed. Query responses stay a fixed size, which
+    // compression could break.
     let router = Router::new()
         .route("/v1/info", get(info))
-        .route("/v1/index", get(index))
+        .route("/v1/index", get(index).layer(CompressionLayer::new()))
         .route("/v1/query", post(query))
         .route("/v1/seen", get(seen))
         .route("/healthz", get(|| async { "ok" }))
         .layer(DefaultBodyLimit::max(64 << 20))
-        .layer(CompressionLayer::new())
         .layer(CorsLayer::permissive().expose_headers([header::HeaderName::from_static("x-db-version")]))
         .with_state(app);
 

@@ -8,7 +8,6 @@ mod store;
 
 use std::{path::PathBuf, time::Instant};
 
-use anyhow::Context;
 use bf_core::{Network, Packer, ROW_BYTES, TxKey};
 use clap::{Parser, Subcommand, ValueEnum};
 use futures_util::{StreamExt, stream};
@@ -180,6 +179,25 @@ async fn sync(net: Net, first_height: u32, dir: &std::path::Path, server: &str, 
                 Err(e) => return Err(e),
             };
 
+            // Each block must extend the one before it, including the last
+            // block of the previous chunk. If not, the server switched forks:
+            // drop the last hundred blocks and index them again.
+            let mut prev = store.last_hash();
+            let mut forked = false;
+            for b in &blocks {
+                if prev.as_ref().is_some_and(|p| *p != b.prev_hash) {
+                    forked = true;
+                    break;
+                }
+                prev = Some(b.hash.clone());
+            }
+            if forked {
+                let back = start.saturating_sub(100).max(first_height);
+                tracing::warn!(at = start, rewind_to = back, "chain does not link up; rewinding");
+                store.rewind(back)?;
+                continue;
+            }
+
             let wanted: Vec<(TxKey, Vec<u8>)> = blocks
                 .iter()
                 .flat_map(|b| {
@@ -206,8 +224,16 @@ async fn sync(net: Net, first_height: u32, dir: &std::path::Path, server: &str, 
             for (key, txid, raw) in fetched {
                 let raw = raw?;
                 let branch = BranchId::for_height(&params, BlockHeight::from_u32(key.height));
-                let s = bf_tx::strip(&raw, branch)
-                    .with_context(|| format!("strip {} at {}", lwd::hex_rev(&txid), key.height))?;
+                let s = match bf_tx::strip(&raw, branch) {
+                    Ok(s) => s,
+                    // A transaction this build cannot parse (say, a format
+                    // from a later upgrade) is left out. Wallets see it as
+                    // not covered; the rest of the chain is still indexed.
+                    Err(e) => {
+                        tracing::warn!(height = key.height, txid = lwd::hex_rev(&txid), "skipping: {e}");
+                        continue;
+                    }
+                };
                 anyhow::ensure!(s.txid.as_ref()[..] == txid[..], "server sent the wrong transaction");
                 raw_bytes += s.original_len;
                 kept_bytes += s.bytes.len();
@@ -220,6 +246,9 @@ async fn sync(net: Net, first_height: u32, dir: &std::path::Path, server: &str, 
             }
             txs += records.len();
             store.commit(&records, end + 1)?;
+            if let Some(last) = blocks.last() {
+                store.set_last_hash(&last.hash)?;
+            }
 
             let done = end + 1 - first;
             let rate = f64::from(done) / started.elapsed().as_secs_f64().max(0.001);

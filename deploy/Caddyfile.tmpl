@@ -6,7 +6,6 @@
 }
 
 __HOST__ {
-	encode gzip
 	handle_path /main/* {
 		reverse_proxy 127.0.0.1:8484
 	}
