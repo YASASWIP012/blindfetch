@@ -1,0 +1,13 @@
+{
+  "network": "main",
+  "first_height": 3529900,
+  "last_height": 3530800,
+  "transactions": 12969,
+  "mined_bytes": 120103983,
+  "stripped_bytes": 25625972,
+  "rows": 2048,
+  "row_bytes": 32768,
+  "database_bytes": 67108864,
+  "index_bytes": 77415,
+  "largest_tx_bytes": 32886
+}
