@@ -98,8 +98,9 @@ A request to `POST /v1/query` carries exactly `batch` YPIR queries (4 by
 default), each asking for one row. The server refuses any other count, and
 clients refuse servers that ask for fewer than 4. A client that needs fewer
 rows fills the round with queries for random rows and shuffles the real ones
-among them. A fetch is at least two rounds. A transaction that spans k rows
-uses k queries.
+among them. A one-off `fetch` is at least two rounds; a scheduled tick
+(below) sends exactly the rounds its schedule fixes, one by default. A
+transaction that spans k rows uses k queries.
 
 The client decodes every answer, dummies included, and checks each row against
 its hash in the index. Any mismatch, and any transaction that fails its txid
