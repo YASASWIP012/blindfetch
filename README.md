@@ -90,10 +90,10 @@ cargo build --release -p bf-indexer -p bf-server -p zcash-devtool
 
 ## Measured
 
-On an Apple M1 laptop: a query against a 1 GiB database takes 1.15 s on one
-core, with 784 KiB up and 120 KiB down. A round of four queries through the
-public URL takes 6 to 9 seconds, most of it the home connection the server
-sits on. Details in [docs/MEASUREMENTS.md](docs/MEASUREMENTS.md).
+On an Apple M1 laptop, against the full mainnet database (410,977
+transactions): a round of four queries is 4.06 MiB up and 0.47 MiB down and
+takes about 4.6 s. Through the public URL it takes longer, most of it the home
+connection the server sits on. Mobile wallets fetch one round per sync. Details in [docs/MEASUREMENTS.md](docs/MEASUREMENTS.md).
 
 ## Limits
 

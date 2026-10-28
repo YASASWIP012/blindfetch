@@ -59,6 +59,10 @@ pub enum Fetched {
     NotCovered,
     /// Left for the next tick of a fixed schedule.
     Deferred,
+    /// Inside the database's height range but not in its index. Fine for a
+    /// transaction with no shielded output; for one where the wallet received
+    /// a shielded note, the server is withholding it.
+    Missing,
 }
 
 fn random_u64() -> u64 {
@@ -282,7 +286,12 @@ impl Blindfetch {
         let mut out = Vec::with_capacity(located.len());
         for (want, entry) in located {
             let Some(entry) = entry else {
-                out.push((want, Fetched::NotCovered));
+                // The index lists every transaction with a shielded output in
+                // its height range. One the range covers but the index does not
+                // list either has no shielded output (transparent only) or is
+                // being withheld; the wallet knows which.
+                let in_range = (self.index.first_height..=self.index.last_height).contains(&want.key.height);
+                out.push((want, if in_range { Fetched::Missing } else { Fetched::NotCovered }));
                 continue;
             };
             let parts: Vec<Vec<u8>> = entry.rows().map(|r| rows[&r].clone()).collect();

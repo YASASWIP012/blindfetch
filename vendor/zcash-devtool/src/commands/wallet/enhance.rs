@@ -45,9 +45,10 @@ pub(crate) struct Command {
     #[arg(long, default_value_t = 300, requires = "blindfetch")]
     every: u64,
 
-    /// With --blindfetch, fetch once and exit instead of running on a
-    /// schedule. This tells the server when you fetched, which can hint that
-    /// a payment just arrived.
+    /// With --blindfetch, fetch exactly one tick and exit. Run it after every
+    /// sync whether or not anything arrived (the mobile profile): the server
+    /// then learns only that a sync happened, which lightwalletd already sees.
+    /// Running it only when something arrived reveals that.
     #[arg(long, requires = "blindfetch")]
     once: bool,
 
@@ -180,6 +181,13 @@ impl Command {
                 "the server claims height {} but this wallet's chain tip is {chain_tip}; refusing",
                 info.last_height
             );
+            // A server far behind the chain would leave new payments pending
+            // forever without saying so.
+            anyhow::ensure!(
+                BlockHeight::from_u32(info.last_height) + 300 >= chain_tip,
+                "the server's database stops at height {}, far behind this wallet's tip {chain_tip}; refusing",
+                info.last_height
+            );
             println!(
                 "Blindfetch: {} transactions, heights {}..={}, {} rows, {} queries per round",
                 info.transactions, info.first_height, info.last_height, info.num_rows, info.batch
@@ -262,6 +270,14 @@ impl Command {
                             }
                         }
                         bf_client::Fetched::NotCovered => not_covered.push(want.txid),
+                        bf_client::Fetched::Missing => {
+                            eprintln!(
+                                "Warning: the server's index does not list {}, mined at height {} inside its range. \
+                                 If this wallet received a shielded note in it, the server is withholding it.",
+                                want.txid, want.key.height
+                            );
+                            not_covered.push(want.txid);
+                        }
                         bf_client::Fetched::Deferred => waiting += 1,
                     }
                 }

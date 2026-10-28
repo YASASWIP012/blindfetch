@@ -86,8 +86,17 @@ least two) remains for tools that do not care, such as the benchmark.
 something arrived, and over weeks those times can be intersected with the
 blocks that carried shielded outputs. zcash-devtool therefore runs on a fixed
 schedule by default (`--every 300`): it fetches every five minutes whether or
-not anything arrived. `--once` fetches once and exits; it leaks the time of
-the fetch, and the docs and help text say so.
+not anything arrived. Mobile wallets should instead fetch exactly one round
+after every sync, unconditionally (`--once` after `sync`): the fetch then
+reveals only that a sync happened, which lightwalletd already sees. Fetching
+only when something arrived reveals arrivals, and the help text says so.
+
+**Withheld transactions.** A server could leave a transaction out of its
+index. The wallet knows from compact blocks where each of its transactions was
+mined; a transaction inside the index's height range that the index does not
+list is reported as `Missing`, and zcash-devtool warns that the server may be
+withholding it. zcash-devtool also refuses a server whose database is more
+than 300 blocks behind the wallet's own tip.
 
 **History before Ironwood.** Transactions mined before Ironwood activation are
 not in the database. In Blindfetch mode zcash-devtool leaves them pending; it

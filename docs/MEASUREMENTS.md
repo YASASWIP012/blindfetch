@@ -61,6 +61,7 @@ database:
 
 | Path | Up | Down | Time |
 |---|---|---|---|
+| Full mainnet database (410,977 transactions, 65,536 rows), client and server on the same laptop, under memory pressure | 4.06 MiB | 0.47 MiB | 4.6 s |
 | Client and server on the same machine | 2.13 MiB | 0.47 MiB | 0.6 s |
 | Through the public URL (Vercel, Cloudflare tunnel, home connection) | 2.13 MiB | 0.47 MiB | 6 to 9 s |
 | Browser demo through the public URL | 2.1 MiB | 480 KiB | 6.2 s round trip, 184 ms to build the queries, 55 ms to open the answers |
@@ -86,10 +87,24 @@ the same record in the server's log: two requests of 2,228,276 bytes in and
 
 ## What this costs a wallet
 
-At the full database size, a tick of one round (the default) is about
-3.1 MiB up and 0.5 MiB down. Downloading the index is about 2 MB once per version. A desktop
-wallet can tick every few minutes. A mobile wallet should tick when the app
-opens and then rarely.
+At the full database size a fetch of one round is 4.06 MiB up and 0.47 MiB
+down, measured. The index is 2.4 MB, downloaded once per database version.
+
+- **Desktop profile** (zcash-devtool default): one round every five minutes,
+  about 1.1 GiB up a day while running. Suited to an always-on desktop or
+  server wallet.
+- **Mobile profile**: one round after every sync, whether or not anything
+  arrived (`enhance --once` after `sync`). The server learns only that a sync
+  happened, which lightwalletd already sees. Ten syncs a day is about 41 MiB up.
+
+## What this costs a server
+
+Each query scans the whole database once. On the M1 laptop a query against
+the 2 GiB padded database takes a little over a second of one core, so a round
+of four queries is about 4.5 core-seconds. At ten rounds per wallet per day
+(the mobile profile) one core serves roughly 1,900 wallets. This is an
+estimate from the laptop numbers above; server CPUs with AVX-512 (which
+`valar-ypir` can use) are faster.
 
 For comparison, a wallet that wanted perfect privacy without PIR would
 download every stored transaction in the range it scanned: about 8 MB per day

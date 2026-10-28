@@ -54,12 +54,15 @@ for (want, fetched) in results {
 
 ## Mobile
 
-A tick of one round costs about 2.1 MiB up and 0.5 MiB down against a small
-database, and about 3.1 MiB up and 0.5 MiB down at the full 1 GiB size (see
-`docs/MEASUREMENTS.md`). The index is downloaded once per database version.
-A mobile wallet should tick when the app opens and then on a slow timer (say
-every 30 minutes while open, or only on Wi-Fi). Payments that arrive between
-ticks wait for the next one.
+A fetch of one round costs 4.06 MiB up and 0.47 MiB down against the full
+mainnet database (see `docs/MEASUREMENTS.md`). The index (2.4 MB) is
+downloaded once per database version.
+
+Use the mobile profile: run exactly one round after every sync, whether or not
+the sync found anything. The server then learns only that a sync happened,
+which the lightwalletd serving compact blocks already knows. Do not fetch only
+when something arrived; that reveals arrivals. Payments that do not fit in one
+round wait for the next sync.
 
 ## Running a server
 
